@@ -585,13 +585,13 @@ export class Game {
     ctx.save();
     
     // Guide panel on the right side
-    const panelW = 195;
+    const panelW = 210;
     const panelH = H - 100;
     const panelX = W - panelW - 8;
     const panelY = 60;
     
-    // Semi-transparent background
-    ctx.fillStyle = 'rgba(6, 6, 18, 0.55)';
+    // Semi-transparent background — dark enough for contrast
+    ctx.fillStyle = 'rgba(4, 4, 14, 0.7)';
     ctx.beginPath();
     if (ctx.roundRect) {
       ctx.roundRect(panelX, panelY, panelW, panelH, 4);
@@ -600,81 +600,80 @@ export class Game {
     }
     ctx.fill();
     
-    ctx.strokeStyle = 'rgba(0, 255, 200, 0.08)';
+    ctx.strokeStyle = 'rgba(0, 255, 200, 0.12)';
     ctx.lineWidth = 1;
     ctx.stroke();
     
-    const x = panelX + 8;
-    const xr = panelX + panelW - 8;
-    let y = panelY + 16;
-    const lineH = 13;
+    const x = panelX + 10;
+    let y = panelY + 18;
+    const lineH = 14;
     
     ctx.textAlign = 'left';
     
     // Title
-    ctx.font = 'bold 10px "Courier New", monospace';
-    ctx.fillStyle = 'rgba(0, 255, 200, 0.5)';
+    ctx.font = 'bold 11px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(0, 255, 200, 0.7)';
     ctx.fillText('COMBAT GUIDE', x, y);
-    y += lineH + 4;
+    y += lineH + 5;
     
     // Attack verbs
-    ctx.font = '9px "Courier New", monospace';
-    ctx.fillStyle = 'rgba(255, 102, 0, 0.6)';
-    ctx.fillText('⚔ ATTACK [verb] [target]', x, y);
+    ctx.font = '10px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(255, 130, 40, 0.85)';
+    ctx.fillText('⚔ ATTACK  [verb] [target]', x, y);
     y += lineH;
-    ctx.fillStyle = 'rgba(255, 102, 0, 0.4)';
+    ctx.fillStyle = 'rgba(255, 130, 40, 0.55)';
     const atkVerbs = Object.entries(VERBS).filter(([,v]) => v.category === 'attack').map(([n]) => n);
     ctx.fillText(atkVerbs.join(' '), x, y);
-    y += lineH + 3;
+    y += lineH + 4;
 
     // Defense verbs
-    ctx.fillStyle = 'rgba(0, 170, 255, 0.6)';
-    ctx.fillText('🛡 DEFEND [verb] (no target)', x, y);
+    ctx.fillStyle = 'rgba(60, 180, 255, 0.85)';
+    ctx.fillText('🛡 DEFEND  [verb] (no tgt)', x, y);
     y += lineH;
-    ctx.fillStyle = 'rgba(0, 170, 255, 0.4)';
+    ctx.fillStyle = 'rgba(60, 180, 255, 0.55)';
     const defVerbs = Object.entries(VERBS).filter(([,v]) => v.category === 'defense').map(([n]) => n);
     ctx.fillText(defVerbs.join('  '), x, y);
-    y += lineH + 3;
+    y += lineH + 4;
 
     // Spell verbs
-    ctx.fillStyle = 'rgba(170, 0, 255, 0.6)';
-    ctx.fillText('✦ SPELL [verb] [target]', x, y);
+    ctx.fillStyle = 'rgba(180, 80, 255, 0.85)';
+    ctx.fillText('✦ SPELL   [verb] [target]', x, y);
     y += lineH;
-    ctx.fillStyle = 'rgba(170, 0, 255, 0.4)';
+    ctx.fillStyle = 'rgba(180, 80, 255, 0.55)';
     const splVerbs = Object.entries(VERBS).filter(([,v]) => v.category === 'spell').map(([n]) => n);
     ctx.fillText(splVerbs.join(' '), x, y);
-    y += lineH + 6;
+    y += lineH + 7;
     
     // Combos section
-    ctx.fillStyle = 'rgba(255, 170, 0, 0.5)';
-    ctx.font = 'bold 9px "Courier New", monospace';
-    ctx.fillText('★ COMBOS', x, y);
-    y += lineH;
+    ctx.fillStyle = 'rgba(255, 200, 60, 0.8)';
+    ctx.font = 'bold 10px "Courier New", monospace';
+    ctx.fillText('★ COMBOS (chain fast!)', x, y);
+    y += lineH + 1;
     
-    ctx.font = '8px "Courier New", monospace';
-    ctx.fillStyle = 'rgba(255, 170, 0, 0.35)';
+    ctx.font = '9px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(255, 200, 60, 0.55)';
     const comboList = [
       'SLASH→STRIKE  ONSLAUGHT 1.8x',
       'DODGE→SLASH   RIPOSTE   2.0x',
       'ICE→CRUSH     SHATTER   3.0x',
       'FIRE→BOLT     FIRESTORM 2.0x',
-      'SLASHx2→STRIKE VORTEX   2.5x',
+      'SLASHx2→STRIKE VORTEX  2.5x',
     ];
     for (const c of comboList) {
       ctx.fillText(c, x, y);
-      y += lineH - 2;
+      y += lineH - 1;
     }
     
-    y += 4;
+    y += 5;
     // Controls
-    ctx.fillStyle = 'rgba(255, 0, 170, 0.4)';
-    ctx.font = 'bold 9px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(255, 60, 180, 0.7)';
+    ctx.font = 'bold 10px "Courier New", monospace';
     ctx.fillText('CONTROLS', x, y);
     y += lineH;
-    ctx.font = '8px "Courier New", monospace';
-    ctx.fillStyle = 'rgba(255, 0, 170, 0.3)';
+    ctx.font = '9px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(255, 60, 180, 0.5)';
     ctx.fillText('ENTER execute  TAB complete', x, y);
-    y += lineH - 2;
+    y += lineH - 1;
     ctx.fillText('ESC cancel     PARRY [tgt]', x, y);
 
     ctx.restore();
