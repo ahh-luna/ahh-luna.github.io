@@ -12,20 +12,16 @@
       height: 100%;
       overflow: hidden;
       background: #000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       font-family: 'Courier New', monospace;
     }
 
     #gameCanvas {
       display: block;
-      border: 1px solid #0a0a1f;
-      /* CRT subtle curvature */
-      box-shadow:
-        0 0 40px rgba(0, 255, 200, 0.05),
-        0 0 100px rgba(0, 255, 200, 0.02),
-        inset 0 0 60px rgba(0, 0, 0, 0.3);
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
     }
 
     /* Prevent text selection */
@@ -42,46 +38,41 @@
     import { Game } from './js/game/Game.js';
 
     const canvas = document.getElementById('gameCanvas');
-    const LOGICAL_WIDTH = 900;
-    const LOGICAL_HEIGHT = 500;
     
-    // HiDPI / Retina fix: scale canvas for sharp text
+    // HiDPI / Retina fix + fullscreen
     function setupCanvas() {
       const dpr = window.devicePixelRatio || 1;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
       
-      // Calculate CSS size to fit viewport
-      const ratio = LOGICAL_WIDTH / LOGICAL_HEIGHT;
-      let w = window.innerWidth;
-      let h = window.innerHeight;
+      // Canvas fills entire viewport
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
       
-      if (w / h > ratio) {
-        w = h * ratio;
-      } else {
-        h = w / ratio;
-      }
+      // Set backing store resolution for sharp text
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
       
-      // Set CSS display size
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
-      
-      // Set actual canvas resolution (scaled by DPR for sharp rendering)
-      canvas.width = LOGICAL_WIDTH * dpr;
-      canvas.height = LOGICAL_HEIGHT * dpr;
-      
-      // Scale context so we can draw in logical pixels
+      // Reset and set transform (don't compound on resize!)
       const ctx = canvas.getContext('2d');
-      ctx.scale(dpr, dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       
-      return { dpr, cssWidth: w, cssHeight: h };
+      return { dpr, width: w, height: h };
     }
     
-    const displayInfo = setupCanvas();
+    let info = setupCanvas();
+    
     window.addEventListener('resize', () => {
-      setupCanvas();
+      info = setupCanvas();
+      if (window._game) {
+        window._game.width = info.width;
+        window._game.height = info.height;
+      }
     });
 
-    // Start game
-    const game = new Game(canvas, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+    // Start game with actual viewport dimensions
+    const game = new Game(canvas, info.width, info.height);
+    window._game = game;
     game.start();
   </script>
 </body>

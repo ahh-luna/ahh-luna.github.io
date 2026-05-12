@@ -583,35 +583,99 @@ export class Game {
 
   _renderMiniBank(ctx, W, H) {
     ctx.save();
-    ctx.font = '9px "Courier New", monospace';
-    ctx.textAlign = 'right';
-
-    const bankY = H - 105;
-    const bankX = W - 12;
-    let y = bankY;
-
+    
+    // Guide panel on the right side
+    const panelW = 195;
+    const panelH = H - 100;
+    const panelX = W - panelW - 8;
+    const panelY = 60;
+    
+    // Semi-transparent background
+    ctx.fillStyle = 'rgba(6, 6, 18, 0.55)';
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(panelX, panelY, panelW, panelH, 4);
+    } else {
+      ctx.rect(panelX, panelY, panelW, panelH);
+    }
+    ctx.fill();
+    
+    ctx.strokeStyle = 'rgba(0, 255, 200, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    const x = panelX + 8;
+    const xr = panelX + panelW - 8;
+    let y = panelY + 16;
+    const lineH = 13;
+    
+    ctx.textAlign = 'left';
+    
+    // Title
+    ctx.font = 'bold 10px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(0, 255, 200, 0.5)';
+    ctx.fillText('COMBAT GUIDE', x, y);
+    y += lineH + 4;
+    
     // Attack verbs
-    ctx.fillStyle = 'rgba(255, 102, 0, 0.5)';
-    ctx.fillText('ATK:', bankX - 180, y);
-    ctx.fillStyle = 'rgba(255, 102, 0, 0.35)';
+    ctx.font = '9px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(255, 102, 0, 0.6)';
+    ctx.fillText('⚔ ATTACK [verb] [target]', x, y);
+    y += lineH;
+    ctx.fillStyle = 'rgba(255, 102, 0, 0.4)';
     const atkVerbs = Object.entries(VERBS).filter(([,v]) => v.category === 'attack').map(([n]) => n);
-    ctx.fillText(atkVerbs.join(' '), bankX, y);
-    y += 13;
+    ctx.fillText(atkVerbs.join(' '), x, y);
+    y += lineH + 3;
 
     // Defense verbs
-    ctx.fillStyle = 'rgba(0, 170, 255, 0.5)';
-    ctx.fillText('DEF:', bankX - 180, y);
-    ctx.fillStyle = 'rgba(0, 170, 255, 0.35)';
+    ctx.fillStyle = 'rgba(0, 170, 255, 0.6)';
+    ctx.fillText('🛡 DEFEND [verb] (no target)', x, y);
+    y += lineH;
+    ctx.fillStyle = 'rgba(0, 170, 255, 0.4)';
     const defVerbs = Object.entries(VERBS).filter(([,v]) => v.category === 'defense').map(([n]) => n);
-    ctx.fillText(defVerbs.join(' '), bankX, y);
-    y += 13;
+    ctx.fillText(defVerbs.join('  '), x, y);
+    y += lineH + 3;
 
     // Spell verbs
-    ctx.fillStyle = 'rgba(255, 0, 170, 0.5)';
-    ctx.fillText('SPL:', bankX - 180, y);
-    ctx.fillStyle = 'rgba(255, 0, 170, 0.35)';
+    ctx.fillStyle = 'rgba(170, 0, 255, 0.6)';
+    ctx.fillText('✦ SPELL [verb] [target]', x, y);
+    y += lineH;
+    ctx.fillStyle = 'rgba(170, 0, 255, 0.4)';
     const splVerbs = Object.entries(VERBS).filter(([,v]) => v.category === 'spell').map(([n]) => n);
-    ctx.fillText(splVerbs.join(' '), bankX, y);
+    ctx.fillText(splVerbs.join(' '), x, y);
+    y += lineH + 6;
+    
+    // Combos section
+    ctx.fillStyle = 'rgba(255, 170, 0, 0.5)';
+    ctx.font = 'bold 9px "Courier New", monospace';
+    ctx.fillText('★ COMBOS', x, y);
+    y += lineH;
+    
+    ctx.font = '8px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(255, 170, 0, 0.35)';
+    const comboList = [
+      'SLASH→STRIKE  ONSLAUGHT 1.8x',
+      'DODGE→SLASH   RIPOSTE   2.0x',
+      'ICE→CRUSH     SHATTER   3.0x',
+      'FIRE→BOLT     FIRESTORM 2.0x',
+      'SLASHx2→STRIKE VORTEX   2.5x',
+    ];
+    for (const c of comboList) {
+      ctx.fillText(c, x, y);
+      y += lineH - 2;
+    }
+    
+    y += 4;
+    // Controls
+    ctx.fillStyle = 'rgba(255, 0, 170, 0.4)';
+    ctx.font = 'bold 9px "Courier New", monospace';
+    ctx.fillText('CONTROLS', x, y);
+    y += lineH;
+    ctx.font = '8px "Courier New", monospace';
+    ctx.fillStyle = 'rgba(255, 0, 170, 0.3)';
+    ctx.fillText('ENTER execute  TAB complete', x, y);
+    y += lineH - 2;
+    ctx.fillText('ESC cancel     PARRY [tgt]', x, y);
 
     ctx.restore();
   }
