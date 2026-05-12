@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KEYSTRIKE — Core Engine Tests</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0f;
+      color: #00ffc8;
+      font-family: 'Courier New', monospace;
+      padding: 20px;
+      font-size: 14px;
+    }
+    h1 {
+      color: #ff00aa;
+      margin-bottom: 10px;
+      font-size: 20px;
+    }
+    h2 {
+      color: #00aaff;
+      margin: 20px 0 8px;
+      font-size: 16px;
+      border-bottom: 1px solid #1a1a2f;
+      padding-bottom: 4px;
+    }
+    .test-pass {
+      color: #00ff88;
+    }
+    .test-fail {
+      color: #ff4444;
+      font-weight: bold;
+    }
+    .test-line {
+      padding: 2px 0 2px 20px;
+      border-left: 2px solid #1a1a2f;
+    }
+    .test-line.pass { border-left-color: #00ff88; }
+    .test-line.fail { border-left-color: #ff4444; }
+    .summary {
+      margin-top: 20px;
+      padding: 12px;
+      border: 1px solid;
+      font-size: 16px;
+    }
+    .summary.all-pass {
+      border-color: #00ff88;
+      color: #00ff88;
+    }
+    .summary.has-fails {
+      border-color: #ff4444;
+      color: #ff4444;
+    }
+    #interactive {
+      margin-top: 30px;
+      padding: 15px;
+      border: 1px solid #00aaff;
+    }
+    #interactive h2 { margin-top: 0; }
+    #inputDisplay {
+      background: #0d0d18;
+      border: 1px solid #333;
+      padding: 10px;
+      font-size: 16px;
+      min-height: 30px;
+      color: #fff;
+      margin: 10px 0;
+    }
+    #inputDisplay .cursor {
+      border-right: 2px solid #00ffc8;
+      animation: blink 0.6s infinite;
+    }
+    @keyframes blink { 50% { border-color: transparent; } }
+    #metricsDisplay {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .metric {
+      background: #0d0d18;
+      padding: 8px;
+      border: 1px solid #1a1a2f;
+    }
+    .metric .label { color: #666; font-size: 10px; }
+    .metric .value { color: #00ffc8; font-size: 18px; }
+    #eventLog {
+      background: #0d0d18;
+      border: 1px solid #1a1a2f;
+      padding: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 11px;
+      color: #888;
+    }
+    #eventLog .event-execute { color: #00ff88; }
+    #eventLog .event-error { color: #ff4444; }
+    #eventLog .event-combo { color: #ffaa00; }
+    #eventLog .event-cancel { color: #ff00aa; }
+  </style>
+</head>
+<body>
+  <h1>⌨ KEYSTRIKE — CORE ENGINE TESTS</h1>
+  <div id="results"></div>
+
+  <div id="interactive">
+    <h2>▸ INTERACTIVE INPUT TEST</h2>
+    <p style="color:#666; margin-bottom: 10px;">
+      Type below to test the InputEngine live. Try: SLASH NEON, DODGE, FIRE BYTE, HEAL
+    </p>
+    <div>
+      <span style="color:#ff00aa;">TARGETS:</span>
+      <span style="color:#ffaa00;" id="targetList"></span>
+    </div>
+    <div id="inputDisplay"><span class="cursor"> </span></div>
+    <div id="metricsDisplay">
+      <div class="metric"><div class="label">WPM</div><div class="value" id="mWPM">0</div></div>
+      <div class="metric"><div class="label">LPM</div><div class="value" id="mLPM">0</div></div>
+      <div class="metric"><div class="label">ACCURACY</div><div class="value" id="mAcc">100%</div></div>
+      <div class="metric"><div class="label">COMBO</div><div class="value" id="mCombo">x0</div></div>
+    </div>
+    <div id="eventLog"></div>
+  </div>
+
+  <script type="module">
+    import { EventBus } from '../js/core/EventBus.js';
+    import { GrammarSystem } from '../js/core/GrammarSystem.js';
+    import { InputEngine } from '../js/core/InputEngine.js';
+    import { ComboSystem } from '../js/core/ComboSystem.js';
+    import { VERBS, COMBOS, TARGET_WORDS, initializeWordBank } from '../js/core/WordBank.js';
+
+    // ═══════════════════════════════════════════════════════════════
+    // TEST FRAMEWORK
+    // ═══════════════════════════════════════════════════════════════
+
+    const resultsEl = document.getElementById('results');
+    let totalTests = 0;
+    let passedTests = 0;
+    let currentSection = '';
+
+    function section(name) {
+      currentSection = name;
+      const h = document.createElement('h2');
+      h.textContent = `▸ ${name}`;
+      resultsEl.appendChild(h);
+    }
+
+    function assert(condition, message) {
+      totalTests++;
+      const div = document.createElement('div');
+      div.className = 'test-line ' + (condition ? 'pass' : 'fail');
+      if (condition) {
+        passedTests++;
+        div.innerHTML = `<span class="test-pass">✓</span> ${message}`;
+      } else {
+        div.innerHTML = `<span class="test-fail">✗ FAIL:</span> ${message}`;
+      }
+      resultsEl.appendChild(div);
+      return condition;
+    }
+
+    function assertEqual(actual, expected, message) {
+      const pass = actual === expected;
+      return assert(pass, pass
+        ? `${message}`
+        : `${message} — expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)}`
+      );
+    }
+
+    function assertClose(actual, expected, tolerance, message) {
+      const pass = Math.abs(actual - expected) <= tolerance;
+      return assert(pass, pass
+        ? `${message} (${actual})`
+        : `${message} — expected ~${expected}±${tolerance}, got: ${actual}`
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // TEST: EventBus
+    // ═══════════════════════════════════════════════════════════════
+
+    section('EventBus');
+
+    (() => {
+      const bus = new EventBus();
+
+      // Basic emit/subscribe
+      let received = null;
+      bus.on('test', (data) => { received = data; });
+      bus.emit('test', { value: 42 });
+      assertEqual(received?.value, 42, 'Basic emit/subscribe works');
+
+      // Unsubscribe
+      received = null;
+      const unsub = bus.on('test2', (data) => { received = data; });
+      unsub();
+      bus.emit('test2', { value: 99 });
+      assertEqual(received, null, 'Unsubscribe prevents callback');
+
+      // Priority ordering
+      const order = [];
+      bus.on('prio', () => order.push('low'), 0);
+      bus.on('prio', () => order.push('high'), 10);
+      bus.on('prio', () => order.push('mid'), 5);
+      bus.emit('prio');
+      assertEqual(order.join(','), 'high,mid,low', 'Priority ordering works');
+
+      // Once
+      let onceCount = 0;
+      bus.once('onceTest', () => onceCount++);
+      bus.emit('onceTest');
+      bus.emit('onceTest');
+      assertEqual(onceCount, 1, 'once() fires exactly once');
+
+      // Wildcard
+      let wildcardEvents = [];
+      bus.on('*', (data, event) => wildcardEvents.push(event));
+      bus.emit('foo');
+      bus.emit('bar');
+      assert(wildcardEvents.includes('foo') && wildcardEvents.includes('bar'),
+        'Wildcard listener receives all events');
+
+      // Listener count
+      const bus2 = new EventBus();
+      bus2.on('x', () => {});
+      bus2.on('x', () => {});
+      assertEqual(bus2.listenerCount('x'), 2, 'listenerCount returns correct count');
+      assertEqual(bus2.listenerCount('y'), 0, 'listenerCount returns 0 for no listeners');
+
+      // Clear
+      bus2.clear('x');
+      assertEqual(bus2.listenerCount('x'), 0, 'clear(event) removes listeners');
+    })();
+
+    // ═══════════════════════════════════════════════════════════════
+    // TEST: GrammarSystem
+    // ═══════════════════════════════════════════════════════════════
+
+    section('GrammarSystem — Verb Registration');
+
+    (() => {
+      const grammar = new GrammarSystem();
+
+      grammar.registerVerb('SLASH', { category: 'attack', baseDamage: 30, selfTargeted: false });
+      grammar.registerVerb('BLOCK', { category: 'defense', baseDamage: 0, selfTargeted: true });
+
+      const slash = grammar.getVerb('SLASH');
+      assert(slash !== undefined, 'getVerb returns registered verb');
+      assertEqual(slash.baseDamage, 30, 'Verb has correct baseDamage');
+      assertEqual(slash.category, 'attack', 'Verb has correct category');
+
+      // Case insensitive
+      const slashLower = grammar.getVerb('slash');
+      assert(slashLower !== undefined, 'getVerb is case-insensitive');
+
+      // Get by category
+      const attacks = grammar.getVerbs('attack');
+      assertEqual(attacks.length, 1, 'getVerbs filters by category');
+
+      const all = grammar.getVerbs();
+      assertEqual(all.length, 2, 'getVerbs() returns all');
+    })();
+
+    section('GrammarSystem — Command Parsing');
+
+    (() => {
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+
+      // Mock targets
+      const mockTargets = [
+        { id: 1, word: 'NEON', entity: {} },
+        { id: 2, word: 'BYTE', entity: {} },
+        { id: 3, word: 'VOID', entity: {} },
+      ];
+      grammar.setTargetResolver(() => mockTargets);
+
+      // Valid targeted command
+      const r1 = grammar.parse('slash neon');
+      assert(r1.valid, 'Parse "slash neon" is valid');
+      assertEqual(r1.type, 'targeted', 'Parse type is "targeted"');
+      assertEqual(r1.verb, 'SLASH', 'Verb is uppercased');
+      assertEqual(r1.target.id, 1, 'Target correctly resolved');
+
+      // Valid self-targeted command
+      const r2 = grammar.parse('block');
+      assert(r2.valid, 'Parse "block" is valid (self-targeted)');
+      assertEqual(r2.type, 'self', 'Parse type is "self"');
+
+      // Unknown verb
+      const r3 = grammar.parse('banana');
+      assert(!r3.valid, 'Parse "banana" is invalid');
+      assertEqual(r3.error, 'UNKNOWN_VERB', 'Error is UNKNOWN_VERB');
+
+      // Missing target
+      const r4 = grammar.parse('slash');
+      assert(!r4.valid, 'Parse "slash" without target is invalid');
+      assertEqual(r4.error, 'MISSING_TARGET', 'Error is MISSING_TARGET');
+
+      // Invalid target
+      const r5 = grammar.parse('slash BANANA');
+      assert(!r5.valid, 'Parse "slash BANANA" is invalid target');
+      assertEqual(r5.error, 'INVALID_TARGET', 'Error is INVALID_TARGET');
+
+      // Empty input
+      const r6 = grammar.parse('');
+      assert(!r6.valid, 'Empty input is invalid');
+      assertEqual(r6.error, 'EMPTY_INPUT', 'Error is EMPTY_INPUT');
+
+      // Case insensitivity
+      const r7 = grammar.parse('FIRE BYTE');
+      assert(r7.valid, 'Uppercase input works');
+
+      const r8 = grammar.parse('fire byte');
+      assert(r8.valid, 'Lowercase input works');
+
+      // Heal (self-targeted spell)
+      const r9 = grammar.parse('heal');
+      assert(r9.valid, 'HEAL is valid self-targeted');
+      assertEqual(r9.type, 'self', 'HEAL type is self');
+
+      // Parry (targeted defense)
+      const r10 = grammar.parse('parry void');
+      assert(r10.valid, 'PARRY [target] is valid');
+      assertEqual(r10.type, 'targeted', 'PARRY type is targeted');
+    })();
+
+    section('GrammarSystem — Partial Parsing');
+
+    (() => {
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+      grammar.setTargetResolver(() => [
+        { id: 1, word: 'NEON', entity: {} },
+        { id: 2, word: 'NEXUS', entity: {} },
+      ]);
+
+      // Empty
+      const p1 = grammar.parsePartial('');
+      assertEqual(p1.state, 'empty', 'Empty buffer → empty state');
+
+      // Partial verb
+      const p2 = grammar.parsePartial('SL');
+      assertEqual(p2.state, 'typing_verb', 'Partial verb → typing_verb');
+      assert(p2.verbSuggestions.includes('SLASH'), 'Suggests SLASH');
+
+      // Complete verb, no space
+      const p3 = grammar.parsePartial('SLASH');
+      assertEqual(p3.state, 'typing_verb', 'Complete verb no space → typing_verb');
+      assert(p3.verbValid, 'Verb is marked valid');
+
+      // Verb + space (awaiting target)
+      const p4 = grammar.parsePartial('SLASH ');
+      assertEqual(p4.state, 'typing_target', 'Verb+space → typing_target');
+      assertEqual(p4.targetSuggestions.length, 2, 'Shows all available targets');
+
+      // Partial target
+      const p5 = grammar.parsePartial('SLASH NE');
+      assertEqual(p5.state, 'typing_target', 'Partial target → typing_target');
+      assert(p5.targetSuggestions.includes('NEON'), 'Suggests NEON');
+      assert(p5.targetSuggestions.includes('NEXUS'), 'Suggests NEXUS');
+
+      // Complete target
+      const p6 = grammar.parsePartial('SLASH NEON');
+      assertEqual(p6.state, 'ready', 'Complete command → ready');
+
+      // Self-targeted with space
+      const p7 = grammar.parsePartial('BLOCK ');
+      assertEqual(p7.state, 'ready', 'Self-targeted + space → ready');
+
+      // Invalid verb partial
+      const p8 = grammar.parsePartial('ZZ');
+      assertEqual(p8.state, 'typing_verb', 'Invalid partial → typing_verb');
+      assertEqual(p8.verbSuggestions.length, 0, 'No suggestions for ZZ');
+    })();
+
+    section('GrammarSystem — Fuzzy Matching');
+
+    (() => {
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+      grammar.setTargetResolver(() => []);
+
+      // Typo in verb
+      const r1 = grammar.parse('SLAH');
+      assert(!r1.valid, 'Typo "SLAH" is invalid');
+      assert(r1.suggestions && r1.suggestions.includes('SLASH'),
+        'Fuzzy suggests SLASH for SLAH');
+
+      const r2 = grammar.parse('FIER');
+      assert(r2.suggestions && r2.suggestions.includes('FIRE'),
+        'Fuzzy suggests FIRE for FIER');
+    })();
+
+    section('GrammarSystem — Cooldowns');
+
+    (() => {
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+      grammar.setTargetResolver(() => [{ id: 1, word: 'NEON', entity: {} }]);
+
+      // FIRE has 2000ms cooldown
+      grammar.markUsed('FIRE');
+      const r1 = grammar.parse('FIRE NEON');
+      assert(!r1.valid, 'FIRE is on cooldown immediately after use');
+      assertEqual(r1.error, 'ON_COOLDOWN', 'Error is ON_COOLDOWN');
+
+      // Cooldown getter
+      const cd = grammar.getCooldown('FIRE');
+      assert(cd > 0, 'getCooldown returns remaining time');
+
+      // SLASH has no cooldown
+      grammar.markUsed('SLASH');
+      const r2 = grammar.parse('SLASH NEON');
+      assert(r2.valid, 'SLASH has no cooldown, always valid');
+
+      // Reset cooldowns
+      grammar.resetCooldowns();
+      const cd2 = grammar.getCooldown('FIRE');
+      assertEqual(cd2, 0, 'resetCooldowns clears all');
+    })();
+
+    // ═══════════════════════════════════════════════════════════════
+    // TEST: ComboSystem
+    // ═══════════════════════════════════════════════════════════════
+
+    section('ComboSystem — Registration');
+
+    (() => {
+      const bus = new EventBus();
+      const combo = new ComboSystem(bus);
+      combo.registerCombos(COMBOS);
+
+      const all = combo.getCombos();
+      assertEqual(all.length, COMBOS.length, `Registered ${COMBOS.length} combos`);
+      assert(all.some(c => c.name === 'ONSLAUGHT'), 'ONSLAUGHT combo registered');
+      assert(all.some(c => c.name === 'SHATTER'), 'SHATTER combo registered');
+    })();
+
+    section('ComboSystem — Sequence Detection');
+
+    (() => {
+      const bus = new EventBus();
+      const combo = new ComboSystem(bus);
+      combo.registerCombos(COMBOS);
+
+      let triggered = null;
+      bus.on('combo:triggered', (data) => { triggered = data; });
+
+      // Simulate SLASH → STRIKE (same target) = ONSLAUGHT
+      bus.emit('input:execute', {
+        command: { valid: true, verb: 'SLASH', targetWord: 'NEON' },
+        comboCount: 1,
+      });
+      assertEqual(triggered, null, 'No combo after first command');
+
+      bus.emit('input:execute', {
+        command: { valid: true, verb: 'STRIKE', targetWord: 'NEON' },
+        comboCount: 2,
+      });
+      assert(triggered !== null, 'Combo triggered after sequence');
+      assertEqual(triggered?.combo?.name, 'ONSLAUGHT', 'ONSLAUGHT detected');
+
+      // Reset for next test
+      triggered = null;
+      combo.reset();
+
+      // SLASH → STRIKE different targets (ONSLAUGHT requires sameTarget)
+      bus.emit('input:execute', {
+        command: { valid: true, verb: 'SLASH', targetWord: 'NEON' },
+        comboCount: 1,
+      });
+      bus.emit('input:execute', {
+        command: { valid: true, verb: 'STRIKE', targetWord: 'BYTE' },
+        comboCount: 2,
+      });
+      assertEqual(triggered, null, 'ONSLAUGHT not triggered with different targets');
+
+      combo.destroy();
+    })();
+
+    section('ComboSystem — Speed Tiers');
+
+    (() => {
+      const bus = new EventBus();
+      const combo = new ComboSystem(bus);
+
+      let speedTier = null;
+      bus.on('combo:speed', (data) => { speedTier = data; });
+
+      // Hit count 3 = RAPID
+      bus.emit('input:execute', {
+        command: { valid: true, verb: 'SLASH', targetWord: 'A' },
+        comboCount: 3,
+      });
+      assertEqual(speedTier?.tier?.name, 'RAPID', 'Speed tier RAPID at count 3');
+
+      speedTier = null;
+      bus.emit('input:execute', {
+        command: { valid: true, verb: 'SLASH', targetWord: 'A' },
+        comboCount: 5,
+      });
+      assertEqual(speedTier?.tier?.name, 'FRENZY', 'Speed tier FRENZY at count 5');
+
+      // Multiplier check
+      const mult = combo.getDamageMultiplier(8);
+      assertEqual(mult, 1.5, 'OVERDRIVE multiplier is 1.5');
+
+      combo.destroy();
+    })();
+
+    // ═══════════════════════════════════════════════════════════════
+    // TEST: WordBank
+    // ═══════════════════════════════════════════════════════════════
+
+    section('WordBank — Data Integrity');
+
+    (() => {
+      // Every verb has required fields
+      for (const [name, def] of Object.entries(VERBS)) {
+        assert(typeof def.category === 'string',
+          `${name} has category`);
+        assert(typeof def.selfTargeted === 'boolean',
+          `${name} has selfTargeted flag`);
+        assert(typeof def.baseDamage === 'number',
+          `${name} has baseDamage`);
+        assert(typeof def.cooldown === 'number',
+          `${name} has cooldown`);
+        assert(typeof def.description === 'string' && def.description.length > 0,
+          `${name} has description`);
+        assert(Array.isArray(def.comboTags),
+          `${name} has comboTags array`);
+      }
+
+      // Category distribution
+      const attacks = Object.values(VERBS).filter(v => v.category === 'attack');
+      const defenses = Object.values(VERBS).filter(v => v.category === 'defense');
+      const spells = Object.values(VERBS).filter(v => v.category === 'spell');
+      assert(attacks.length >= 4, `${attacks.length} attack verbs (≥4)`);
+      assert(defenses.length >= 2, `${defenses.length} defense verbs (≥2)`);
+      assert(spells.length >= 3, `${spells.length} spell verbs (≥3)`);
+
+      // Combo sequences reference valid verbs
+      for (const combo of COMBOS) {
+        for (const verb of combo.sequence) {
+          if (verb !== '*') {
+            assert(VERBS[verb] !== undefined,
+              `Combo "${combo.name}" verb "${verb}" exists in VERBS`);
+          }
+        }
+      }
+
+      // Target words are unique per tier
+      for (const [tier, words] of Object.entries(TARGET_WORDS)) {
+        const unique = new Set(words);
+        assertEqual(unique.size, words.length,
+          `Target tier "${tier}" has no duplicates`);
+      }
+
+      // No overlap between verbs and target words
+      const allTargets = Object.values(TARGET_WORDS).flat();
+      const verbNames = Object.keys(VERBS);
+      for (const target of allTargets) {
+        assert(!verbNames.includes(target),
+          `Target word "${target}" doesn't conflict with a verb`);
+      }
+    })();
+
+    section('WordBank — Initialization');
+
+    (() => {
+      const grammar = new GrammarSystem();
+      const bus = new EventBus();
+      const comboSys = new ComboSystem(bus);
+
+      initializeWordBank(grammar, comboSys);
+
+      assertEqual(grammar.getVerbs().length, Object.keys(VERBS).length,
+        'All verbs registered in grammar');
+      assertEqual(comboSys.getCombos().length, COMBOS.length,
+        'All combos registered in combo system');
+
+      comboSys.destroy();
+    })();
+
+    // ═══════════════════════════════════════════════════════════════
+    // TEST: InputEngine
+    // ═══════════════════════════════════════════════════════════════
+
+    section('InputEngine — Buffer Management');
+
+    (() => {
+      const bus = new EventBus();
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+      grammar.setTargetResolver(() => [{ id: 1, word: 'NEON', entity: {} }]);
+      const input = new InputEngine(bus, grammar);
+
+      // Simulate typing by directly calling internal methods
+      input.active = true;
+      input.sessionStartTime = performance.now();
+
+      // Type 'H' 'E' 'A' 'L'
+      const now = performance.now();
+      input._handleCharacter('h', now);
+      assertEqual(input.buffer, 'h', 'Buffer has "h" after typing h');
+      assertEqual(input.cursorPos, 1, 'Cursor at position 1');
+
+      input._handleCharacter('e', now + 10);
+      input._handleCharacter('a', now + 20);
+      input._handleCharacter('l', now + 30);
+      assertEqual(input.buffer, 'heal', 'Buffer has "heal"');
+      assertEqual(input.cursorPos, 4, 'Cursor at position 4');
+
+      // Backspace
+      input._handleBackspace(now + 40);
+      assertEqual(input.buffer, 'hea', 'Backspace removes last char');
+      assertEqual(input.cursorPos, 3, 'Cursor moved back');
+
+      // Backspace on empty
+      input.buffer = '';
+      input.cursorPos = 0;
+      input._handleBackspace(now + 50);
+      assertEqual(input.buffer, '', 'Backspace on empty does nothing');
+
+      input.deactivate();
+    })();
+
+    section('InputEngine — Command Execution');
+
+    (() => {
+      const bus = new EventBus();
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+      grammar.setTargetResolver(() => [{ id: 1, word: 'NEON', entity: {} }]);
+      const input = new InputEngine(bus, grammar);
+      input.active = true;
+      input.sessionStartTime = performance.now();
+
+      let executed = null;
+      let errorEmitted = null;
+      bus.on('input:execute', (data) => { executed = data; });
+      bus.on('input:error', (data) => { errorEmitted = data; });
+
+      // Type and execute a valid command
+      const now = performance.now();
+      input._handleCharacter('h', now);
+      input._handleCharacter('e', now + 10);
+      input._handleCharacter('a', now + 20);
+      input._handleCharacter('l', now + 30);
+      input._handleExecute(now + 40);
+
+      assert(executed !== null, 'Execute event emitted');
+      assert(executed.command.valid, 'Command is valid');
+      assertEqual(executed.command.verb, 'HEAL', 'Verb is HEAL');
+      assertEqual(input.buffer, '', 'Buffer cleared after execute');
+      assertEqual(input.totalCommands, 1, 'totalCommands incremented');
+      assertEqual(input.validCommands, 1, 'validCommands incremented');
+
+      // Execute invalid command
+      executed = null;
+      input._handleCharacter('x', now + 100);
+      input._handleCharacter('y', now + 110);
+      input._handleCharacter('z', now + 120);
+      input._handleExecute(now + 130);
+
+      assert(errorEmitted !== null, 'Error event emitted for invalid command');
+      assertEqual(errorEmitted.error.error, 'UNKNOWN_VERB', 'Error is UNKNOWN_VERB');
+      assertEqual(input.totalCommands, 2, 'totalCommands incremented for invalid too');
+      assertEqual(input.validCommands, 1, 'validCommands NOT incremented for invalid');
+
+      input.deactivate();
+    })();
+
+    section('InputEngine — Cancel (Escape)');
+
+    (() => {
+      const bus = new EventBus();
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+      const input = new InputEngine(bus, grammar);
+      input.active = true;
+      input.sessionStartTime = performance.now();
+
+      let cancelData = null;
+      bus.on('input:cancel', (data) => { cancelData = data; });
+
+      const now = performance.now();
+      input._handleCharacter('s', now);
+      input._handleCharacter('l', now + 10);
+      input._handleCharacter('a', now + 20);
+
+      assertEqual(input.buffer, 'sla', 'Buffer has "sla"');
+      input._handleCancel(now + 30);
+      assertEqual(input.buffer, '', 'Buffer cleared after cancel');
+      assert(cancelData !== null, 'Cancel event emitted');
+      assertEqual(cancelData.previousBuffer, 'sla', 'Cancel has previous buffer');
+
+      // Cancel on empty = no event
+      cancelData = null;
+      input._handleCancel(now + 40);
+      assertEqual(cancelData, null, 'No cancel event on empty buffer');
+
+      input.deactivate();
+    })();
+
+    section('InputEngine — Metrics Tracking');
+
+    (() => {
+      const bus = new EventBus();
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+      grammar.setTargetResolver(() => [{ id: 1, word: 'NEON', entity: {} }]);
+      const input = new InputEngine(bus, grammar);
+      input.active = true;
+      input.sessionStartTime = performance.now();
+
+      const now = performance.now();
+
+      // Type "heal" with 1 backspace (typo)
+      input._handleCharacter('h', now);
+      input._handleCharacter('e', now + 10);
+      input._handleCharacter('z', now + 20);  // typo
+      input._handleBackspace(now + 30);        // fix
+      input._handleCharacter('a', now + 40);
+      input._handleCharacter('l', now + 50);
+      input._handleExecute(now + 60);
+
+      assertEqual(input.totalCharacters, 5, 'Total characters = 5 (h,e,z,a,l)');
+      assertEqual(input.totalBackspaces, 1, 'Total backspaces = 1');
+
+      const metrics = input.getMetrics();
+      assert(metrics.accuracy < 1, 'Accuracy < 1 with backspaces');
+      assertClose(metrics.accuracy, 5/6, 0.01, 'Accuracy = 5/6 ≈ 0.833');
+      assertEqual(metrics.totalCommands, 1, 'Metrics show 1 command');
+
+      // Command history records accuracy
+      const last = input.commandHistory[input.commandHistory.length - 1];
+      assert(last.accuracy < 1, 'Per-command accuracy tracks backspaces');
+      assertEqual(last.characters, 5, 'Command had 5 characters');
+      assertEqual(last.backspaces, 1, 'Command had 1 backspace');
+
+      input.deactivate();
+    })();
+
+    section('InputEngine — Combo Tracking');
+
+    (() => {
+      const bus = new EventBus();
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+      grammar.setTargetResolver(() => [{ id: 1, word: 'NEON', entity: {} }]);
+      const input = new InputEngine(bus, grammar);
+      input.active = true;
+      input.sessionStartTime = performance.now();
+
+      const now = performance.now();
+
+      // Rapid valid commands (use slash which has 0 cooldown)
+      input.buffer = 'slash neon';
+      input.commandStartTime = now;
+      input.commandCharacters = 10;
+      input._handleExecute(now);
+
+      assertEqual(input.comboCount, 1, 'First command = combo 1');
+
+      // Second command within combo window
+      input.buffer = 'slash neon';
+      input.commandStartTime = now + 500;
+      input.commandCharacters = 10;
+      input._handleExecute(now + 500);
+
+      assertEqual(input.comboCount, 2, 'Second quick command = combo 2');
+
+      // Third
+      input.buffer = 'slash neon';
+      input.commandStartTime = now + 1000;
+      input.commandCharacters = 10;
+      input._handleExecute(now + 1000);
+
+      assertEqual(input.comboCount, 3, 'Third = combo 3');
+      assertEqual(input.maxCombo, 3, 'Max combo tracks highest');
+
+      input.deactivate();
+    })();
+
+    section('InputEngine — Command History');
+
+    (() => {
+      const bus = new EventBus();
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+      grammar.setTargetResolver(() => [{ id: 1, word: 'NEON', entity: {} }]);
+      const input = new InputEngine(bus, grammar);
+      input.active = true;
+      input.sessionStartTime = performance.now();
+
+      const now = performance.now();
+
+      // Execute several commands (use no-cooldown verbs for valid ones)
+      ['slash neon', 'strike neon', 'jab neon', 'xyz'].forEach((cmd, i) => {
+        input.buffer = cmd;
+        input.commandStartTime = now + i * 100;
+        input.commandCharacters = cmd.length;
+        input._handleExecute(now + i * 100 + 50);
+      });
+
+      assertEqual(input.commandHistory.length, 4, 'History has 4 entries');
+
+      const recent = input.getRecentCommands(2);
+      assertEqual(recent.length, 2, 'getRecentCommands(2) returns 2');
+
+      const valid = input.getValidCommands();
+      assertEqual(valid.length, 3, '3 valid commands in history');
+
+      const last = input.getLastValidCommand();
+      assertEqual(last.parsed.verb, 'JAB', 'Last valid command was JAB');
+
+      input.deactivate();
+    })();
+
+    section('InputEngine — Reset');
+
+    (() => {
+      const bus = new EventBus();
+      const grammar = new GrammarSystem();
+      grammar.registerVerbs(VERBS);
+      const input = new InputEngine(bus, grammar);
+
+      input.totalKeystrokes = 100;
+      input.totalCommands = 50;
+      input.buffer = 'test';
+      input.comboCount = 5;
+      input.maxCombo = 10;
+
+      input.reset();
+
+      assertEqual(input.totalKeystrokes, 0, 'Reset clears totalKeystrokes');
+      assertEqual(input.totalCommands, 0, 'Reset clears totalCommands');
+      assertEqual(input.buffer, '', 'Reset clears buffer');
+      assertEqual(input.comboCount, 0, 'Reset clears comboCount');
+      assertEqual(input.maxCombo, 0, 'Reset clears maxCombo');
+      assertEqual(input.commandHistory.length, 0, 'Reset clears history');
+    })();
+
+    // ═══════════════════════════════════════════════════════════════
+    // TEST SUMMARY
+    // ═══════════════════════════════════════════════════════════════
+
+    const summaryEl = document.createElement('div');
+    const allPass = passedTests === totalTests;
+    summaryEl.className = `summary ${allPass ? 'all-pass' : 'has-fails'}`;
+    summaryEl.textContent = allPass
+      ? `✓ ALL ${totalTests} TESTS PASSED`
+      : `✗ ${passedTests}/${totalTests} PASSED — ${totalTests - passedTests} FAILED`;
+    resultsEl.appendChild(summaryEl);
+
+    // ═══════════════════════════════════════════════════════════════
+    // INTERACTIVE TEST
+    // ═══════════════════════════════════════════════════════════════
+
+    const iBus = new EventBus();
+    const iGrammar = new GrammarSystem();
+    const iCombo = new ComboSystem(iBus);
+    initializeWordBank(iGrammar, iCombo);
+
+    const mockTargets = [
+      { id: 1, word: 'NEON', entity: {} },
+      { id: 2, word: 'BYTE', entity: {} },
+      { id: 3, word: 'VOID', entity: {} },
+      { id: 4, word: 'FLUX', entity: {} },
+    ];
+    iGrammar.setTargetResolver(() => mockTargets);
+
+    document.getElementById('targetList').textContent =
+      mockTargets.map(t => t.word).join('  ');
+
+    const iInput = new InputEngine(iBus, iGrammar);
+    const inputDisplay = document.getElementById('inputDisplay');
+    const eventLog = document.getElementById('eventLog');
+
+    function addLog(text, cls = '') {
+      const line = document.createElement('div');
+      line.className = cls;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+      eventLog.prepend(line);
+      if (eventLog.children.length > 50) eventLog.lastChild.remove();
+    }
+
+    iBus.on('input:bufferChange', ({ buffer, partial }) => {
+      let html = '';
+      if (partial.state === 'typing_verb' && partial.verbValid) {
+        html = `<span style="color:#00ff88">${buffer}</span>`;
+      } else if (partial.state === 'typing_target' || partial.state === 'ready') {
+        const parts = buffer.split(' ');
+        html = `<span style="color:#00ff88">${parts[0]}</span> `;
+        if (parts[1]) {
+          const color = partial.state === 'ready' ? '#ffaa00' : '#fff';
+          html += `<span style="color:${color}">${parts[1]}</span>`;
+        }
+      } else {
+        const color = buffer.length > 0 && partial.verbSuggestions?.length === 0
+          ? '#ff4444' : '#fff';
+        html = `<span style="color:${color}">${buffer}</span>`;
+      }
+      html += '<span class="cursor"> </span>';
+      if (partial.verbSuggestions?.length > 0 && partial.state === 'typing_verb' && !partial.verbValid) {
+        html += `<span style="color:#444; margin-left:20px">${partial.verbSuggestions.slice(0, 3).join(' ')}</span>`;
+      }
+      if (partial.targetSuggestions?.length > 0 && partial.state === 'typing_target') {
+        html += `<span style="color:#444; margin-left:20px">${partial.targetSuggestions.slice(0, 4).join(' ')}</span>`;
+      }
+      inputDisplay.innerHTML = html;
+    });
+
+    iBus.on('input:execute', ({ command, record, comboCount }) => {
+      addLog(
+        `EXECUTE: ${command.raw} → ${command.verb}${command.targetWord ? ' → ' + command.targetWord : ''} `
+        + `(${record.wpm} WPM, ${Math.round(record.accuracy * 100)}% acc, combo x${comboCount})`,
+        'event-execute'
+      );
+    });
+
+    iBus.on('input:error', ({ error }) => {
+      addLog(`ERROR: ${error.errorMessage || error.error}`, 'event-error');
+    });
+
+    iBus.on('input:cancel', ({ previousBuffer }) => {
+      addLog(`CANCEL: cleared "${previousBuffer}"`, 'event-cancel');
+    });
+
+    iBus.on('combo:triggered', ({ combo, chainCount }) => {
+      addLog(`★ COMBO: ${combo.name}! (${combo.damageMultiplier}x damage, chain x${chainCount})`, 'event-combo');
+    });
+
+    iBus.on('combo:speed', ({ tier }) => {
+      addLog(`⚡ SPEED: ${tier.name}! (${tier.multiplier}x multiplier)`, 'event-combo');
+    });
+
+    iBus.on('input:metricsUpdate', ({ wpm, lpm, accuracy, comboCount }) => {
+      document.getElementById('mWPM').textContent = wpm;
+      document.getElementById('mLPM').textContent = lpm;
+      document.getElementById('mAcc').textContent = Math.round(accuracy * 100) + '%';
+      document.getElementById('mCombo').textContent = 'x' + comboCount;
+    });
+
+    iInput.activate();
+
+    addLog('Input engine active. Type commands and press Enter.', '');
+    addLog('Available: SLASH, STRIKE, JAB, CRUSH, PIERCE, REND, BLOCK, DODGE, PARRY, FIRE, ICE, BOLT, HEAL, DRAIN', '');
+  </script>
+</body>
+</html>
