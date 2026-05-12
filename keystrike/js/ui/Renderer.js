@@ -5,13 +5,14 @@
  * HUD, terminal input, and all visual effects.
  */
 export class Renderer {
-  constructor(canvas, eventBus) {
+  constructor(canvas, eventBus, logicalWidth, logicalHeight) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.eventBus = eventBus;
 
-    this.width = canvas.width;
-    this.height = canvas.height;
+    // Use logical dimensions (not canvas.width which is scaled by DPR)
+    this.width = logicalWidth || 900;
+    this.height = logicalHeight || 500;
     this.groundY = Math.round(this.height * 0.72);
 
     // Visual state

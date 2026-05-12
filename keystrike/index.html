@@ -20,7 +20,6 @@
 
     #gameCanvas {
       display: block;
-      image-rendering: pixelated;
       border: 1px solid #0a0a1f;
       /* CRT subtle curvature */
       box-shadow:
@@ -37,16 +36,21 @@
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="900" height="500"></canvas>
+  <canvas id="gameCanvas"></canvas>
   
   <script type="module">
     import { Game } from './js/game/Game.js';
 
     const canvas = document.getElementById('gameCanvas');
+    const LOGICAL_WIDTH = 900;
+    const LOGICAL_HEIGHT = 500;
     
-    // Scale to fit viewport while maintaining aspect ratio
-    function resize() {
-      const ratio = 900 / 500;
+    // HiDPI / Retina fix: scale canvas for sharp text
+    function setupCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      
+      // Calculate CSS size to fit viewport
+      const ratio = LOGICAL_WIDTH / LOGICAL_HEIGHT;
       let w = window.innerWidth;
       let h = window.innerHeight;
       
@@ -56,15 +60,28 @@
         h = w / ratio;
       }
       
+      // Set CSS display size
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
+      
+      // Set actual canvas resolution (scaled by DPR for sharp rendering)
+      canvas.width = LOGICAL_WIDTH * dpr;
+      canvas.height = LOGICAL_HEIGHT * dpr;
+      
+      // Scale context so we can draw in logical pixels
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      
+      return { dpr, cssWidth: w, cssHeight: h };
     }
     
-    resize();
-    window.addEventListener('resize', resize);
+    const displayInfo = setupCanvas();
+    window.addEventListener('resize', () => {
+      setupCanvas();
+    });
 
     // Start game
-    const game = new Game(canvas);
+    const game = new Game(canvas, LOGICAL_WIDTH, LOGICAL_HEIGHT);
     game.start();
   </script>
 </body>

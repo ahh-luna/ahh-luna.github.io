@@ -15,11 +15,12 @@ import { ParticleSystem } from '../fx/Particles.js';
 import { ScreenFX } from '../fx/ScreenFX.js';
 
 export class Game {
-  constructor(canvas) {
+  constructor(canvas, logicalWidth, logicalHeight) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.width = canvas.width;
-    this.height = canvas.height;
+    // Use logical dimensions (canvas.width/height are DPR-scaled)
+    this.width = logicalWidth || 900;
+    this.height = logicalHeight || 500;
 
     // Core systems
     this.eventBus = new EventBus();
@@ -297,7 +298,7 @@ export class Game {
     ctx.save();
     ctx.font = '13px "Courier New", monospace';
     ctx.textAlign = 'left';
-    const startY = 170;
+    const startY = 160;
     for (let i = 0; i < this.bootLines.length; i++) {
       const line = this.bootLines[i];
       if (line.startsWith('>')) {
@@ -312,14 +313,111 @@ export class Game {
         ctx.fillStyle = '#666';
         ctx.shadowBlur = 0;
       }
-      ctx.fillText(line, 80, startY + i * 22);
+      ctx.fillText(line, 60, startY + i * 20);
     }
     ctx.restore();
+
+    // Instructions panel (right side)
+    if (this.state === 'menu') {
+      this._renderInstructions(ctx, W, H);
+    }
 
     // Word bank overlay
     if (this.showBank) {
       this._renderWordBank(ctx, W, H);
     }
+  }
+
+  _renderInstructions(ctx, W, H) {
+    ctx.save();
+    const panelX = W / 2 - 10;
+    const panelY = 55;
+    const panelW = W / 2 - 20;
+    const panelH = H - 120;
+
+    // Panel background
+    ctx.fillStyle = 'rgba(6, 6, 18, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(panelX, panelY, panelW, panelH, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 255, 200, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    let y = panelY + 28;
+    const x = panelX + 18;
+    const lineH = 17;
+
+    // Section: HOW TO PLAY
+    ctx.font = 'bold 13px "Courier New", monospace';
+    ctx.fillStyle = '#00ffc8';
+    ctx.textAlign = 'left';
+    ctx.fillText('HOW TO PLAY', x, y);
+    y += lineH + 4;
+
+    ctx.font = '11px "Courier New", monospace';
+    ctx.fillStyle = '#8899aa';
+    const howTo = [
+      'Enemies approach with WORDS above them.',
+      'Type a VERB + the enemy\'s WORD to attack.',
+      '',
+      '  Example: SLASH BUG  →  slash the "BUG"',
+      '  Example: FIRE NEON  →  fireball at "NEON"',
+      '',
+      'Defensive verbs need no target:',
+      '  BLOCK  →  reduces incoming damage',
+      '  DODGE  →  evade the next attack',
+      '  HEAL   →  restore your HP',
+    ];
+    for (const line of howTo) {
+      if (line.startsWith('  Example') || line.startsWith('  BLOCK') || line.startsWith('  DODGE') || line.startsWith('  HEAL')) {
+        ctx.fillStyle = '#bbccdd';
+      } else {
+        ctx.fillStyle = '#8899aa';
+      }
+      ctx.fillText(line, x, y);
+      y += lineH;
+    }
+
+    y += 6;
+    // Section: COMBOS
+    ctx.font = 'bold 13px "Courier New", monospace';
+    ctx.fillStyle = '#ffaa00';
+    ctx.fillText('COMBOS', x, y);
+    y += lineH;
+
+    ctx.font = '11px "Courier New", monospace';
+    ctx.fillStyle = '#8899aa';
+    const combos = [
+      'SLASH → STRIKE = ONSLAUGHT (1.8x)',
+      'ICE → CRUSH   = SHATTER   (3.0x)',
+      'DODGE → SLASH  = RIPOSTE   (2.0x)',
+    ];
+    for (const line of combos) {
+      ctx.fillText(line, x, y);
+      y += lineH;
+    }
+
+    y += 6;
+    // Section: CONTROLS
+    ctx.font = 'bold 13px "Courier New", monospace';
+    ctx.fillStyle = '#ff00aa';
+    ctx.fillText('CONTROLS', x, y);
+    y += lineH;
+
+    ctx.font = '11px "Courier New", monospace';
+    ctx.fillStyle = '#8899aa';
+    const controls = [
+      'ENTER  →  execute command',
+      'TAB    →  autocomplete word',
+      'ESC    →  cancel / clear input',
+    ];
+    for (const line of controls) {
+      ctx.fillText(line, x, y);
+      y += lineH;
+    }
+
+    ctx.restore();
   }
 
   _renderWordBank(ctx, W, H) {
