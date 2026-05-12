@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Espresso Yourself ☕</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:     #140c00;
+            --bg2:    #0e0800;
+            --panel:  #1e1100;
+            --border: #3a2510;
+            --gold:   #f5c842;
+            --cream:  #f0e6c8;
+            --dim:    #6a4820;
+            --text:   #c9a96e;
+            --green:  #6abf69;
+            --blue:   #52a8e0;
+            --red:    #e05252;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 40px;
+        }
+
+        /* ── Header ─────────────────────────────────────────── */
+        .header {
+            width: 100%;
+            max-width: 680px;
+            padding: 14px 16px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+        .title    { font-size: 1.3rem; color: var(--gold); font-weight: 800; letter-spacing: -0.5px; }
+        .subtitle { font-size: 0.68rem; color: var(--dim); margin-top: 1px; }
+        .header-coins { font-size: 1rem; color: var(--gold); font-weight: bold; }
+        .header-round { font-size: 0.7rem; color: var(--dim); text-align: right; margin-top: 2px; }
+
+        /* ── Game area ───────────────────────────────────────── */
+        .game {
+            width: 100%;
+            max-width: 680px;
+            padding: 0 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* ── Round bar ───────────────────────────────────────── */
+        .round-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+        }
+        .rb-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--dim); margin-bottom: 2px; }
+        .rb-val   { font-size: 1.15rem; font-weight: bold; }
+        .rb-target { color: var(--gold); }
+        .rb-score  { color: var(--green); }
+        .progress-wrap { flex: 1; padding: 0 16px; }
+        .progress-bar  { height: 7px; background: var(--bg2); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease, background 0.4s; background: var(--blue); }
+
+        /* ── Resources ───────────────────────────────────────── */
+        .resources {
+            display: flex;
+            gap: 16px;
+            font-size: 0.78rem;
+            padding: 0 2px;
+        }
+        .res-val { color: var(--cream); font-weight: bold; }
+
+        /* ── Score preview ───────────────────────────────────── */
+        .score-display {
+            background: var(--bg2);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            min-height: 88px;
+            justify-content: center;
+        }
+        .drink-label { font-size: 1rem; color: var(--cream); font-weight: bold; }
+        .score-formula {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        .chips-pill {
+            background: #0d2a45;
+            color: #7ec8f5;
+            padding: 5px 14px;
+            border-radius: 8px;
+            min-width: 64px;
+            text-align: center;
+        }
+        .mult-pill {
+            background: #3a0000;
+            color: #f07070;
+            padding: 5px 14px;
+            border-radius: 8px;
+            min-width: 54px;
+            text-align: center;
+        }
+        .sep   { color: var(--dim); font-size: 0.9rem; }
+        .total { color: var(--gold); font-size: 1.5rem; }
+        .score-log { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+        .score-tag {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 2px 8px;
+            font-size: 0.68rem;
+            color: var(--green);
+        }
+
+        /* ── Jokers ──────────────────────────────────────────── */
+        .section-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); }
+        .jokers-row {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 2px;
+            scrollbar-width: none;
+        }
+        .jokers-row::-webkit-scrollbar { display: none; }
+
+        .joker-slot {
+            min-width: 82px;
+            max-width: 82px;
+            min-height: 90px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .joker-slot.filled {
+            background: var(--panel);
+            border: 1px solid #7a5020;
+            cursor: default;
+        }
+        .joker-slot.empty {
+            border: 1px dashed var(--border);
+            color: var(--border);
+            font-size: 0.6rem;
+        }
+        .joker-emoji { font-size: 1.6rem; }
+        .joker-name  { font-size: 0.56rem; color: var(--gold); text-align: center; line-height: 1.2; padding: 0 4px; }
+        .joker-tip {
+            display: none;
+            position: absolute;
+            bottom: 105%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2a1a08;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 0.64rem;
+            color: var(--cream);
+            width: 150px;
+            text-align: center;
+            line-height: 1.4;
+            z-index: 30;
+            pointer-events: none;
+        }
+        .joker-slot.filled:hover .joker-tip { display: block; }
+
+        /* ── Play area ───────────────────────────────────────── */
+        .play-area {
+            min-height: 108px;
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px;
+            flex-wrap: wrap;
+            transition: border-color 0.2s;
+        }
+        .play-area.lit { border-color: var(--gold); }
+        .play-hint { color: var(--border); font-size: 0.8rem; text-align: center; pointer-events: none; }
+
+        /* ── Buttons ─────────────────────────────────────────── */
+        .btn-row { display: flex; gap: 10px; }
+        .btn {
+            flex: 1;
+            padding: 13px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+        }
+        .btn-brew { background: var(--gold); color: #140c00; }
+        .btn-brew:hover:not(:disabled) { background: #ffd96a; }
+        .btn-brew:disabled { background: #3e2c00; color: #5a4800; cursor: not-allowed; }
+        .btn-discard { background: var(--panel); border: 1px solid var(--border); color: var(--text); }
+        .btn-discard:hover:not(:disabled) { background: #2e1c08; }
+        .btn-discard:disabled { opacity: 0.38; cursor: not-allowed; }
+
+        /* ── Hand ────────────────────────────────────────────── */
+        .hand-row {
+            display: flex;
+            gap: 7px;
+            overflow-x: auto;
+            padding: 8px 4px 4px;
+            justify-content: center;
+            flex-wrap: wrap;
+            scrollbar-width: none;
+        }
+        .hand-row::-webkit-scrollbar { display: none; }
+
+        /* ── Cards ───────────────────────────────────────────── */
+        .card {
+            width: 72px;
+            min-height: 94px;
+            background: #f5f0e8;
+            border: 2px solid #d0c0a0;
+            border-radius: 9px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+            flex-shrink: 0;
+            user-select: none;
+            color: #1a0f00;
+        }
+        .card:hover:not(.in-play) { transform: translateY(-6px); }
+        .card.selected {
+            border-color: var(--gold);
+            transform: translateY(-14px);
+            box-shadow: 0 8px 22px rgba(245,200,66,0.45);
+        }
+        .card.in-play { cursor: default; }
+        .card-emoji { font-size: 1.5rem; }
+        .card-name  { font-size: 0.54rem; font-weight: 700; color: #3a2000; text-align: center; line-height: 1.1; padding: 0 3px; }
+        .card-chips { font-size: 0.72rem; font-weight: bold; color: #0d3a5c; background: #c8e4f5; padding: 1px 6px; border-radius: 5px; }
+
+        /* ── Shop ────────────────────────────────────────────── */
+        .shop {
+            display: none;
+            flex-direction: column;
+            gap: 14px;
+            width: 100%;
+            max-width: 680px;
+            padding: 0 12px;
+        }
+        .shop.active { display: flex; }
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .shop-title    { font-size: 1.3rem; color: var(--gold); font-weight: 800; }
+        .shop-subtitle { font-size: 0.7rem; color: var(--dim); margin-top: 2px; }
+        .shop-coins    { font-size: 1rem; color: var(--gold); font-weight: bold; }
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .shop-item {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 12px 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            text-align: center;
+        }
+        .shop-item-type  { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--dim); }
+        .shop-item-emoji { font-size: 2rem; }
+        .shop-item-name  { font-size: 0.82rem; color: var(--cream); font-weight: bold; }
+        .shop-item-desc  { font-size: 0.66rem; color: var(--dim); line-height: 1.4; }
+        .btn-buy {
+            width: 100%;
+            margin-top: 4px;
+            padding: 8px;
+            border-radius: 7px;
+            border: none;
+            background: var(--gold);
+            color: #140c00;
+            font-size: 0.82rem;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s;
+        }
+        .btn-buy:hover:not(:disabled) { background: #ffd96a; }
+        .btn-buy:disabled { background: #3e2c00; color: #5a4800; cursor: not-allowed; }
+        .shop-actions { display: flex; gap: 10px; }
+        .btn-next {
+            flex: 2;
+            padding: 14px;
+            border-radius: 10px;
+            border: none;
+            background: var(--green);
+            color: #071a07;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-next:hover { background: #82cf81; }
+        .btn-reroll {
+            flex: 1;
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-reroll:hover:not(:disabled) { background: #2e1c08; }
+        .btn-reroll:disabled { opacity: 0.38; cursor: not-allowed; }
+
+        /* ── Overlay ─────────────────────────────────────────── */
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(14,8,0,0.94);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            z-index: 100;
+            padding: 24px;
+        }
+        .overlay.active { display: flex; }
+        .overlay-title  { font-size: 2.4rem; color: var(--gold); text-align: center; line-height: 1.1; }
+        .overlay-msg    { font-size: 0.9rem; color: var(--text); text-align: center; max-width: 340px; line-height: 1.7; }
+        .btn-again {
+            padding: 12px 32px;
+            border-radius: 10px;
+            border: 1px solid var(--gold);
+            background: transparent;
+            color: var(--gold);
+            font-size: 1rem;
+            cursor: pointer;
+            font-family: inherit;
+            margin-top: 8px;
+            transition: all 0.15s;
+        }
+        .btn-again:hover { background: var(--gold); color: #140c00; }
+
+        /* ── Floating score anim ─────────────────────────────── */
+        .float-score {
+            position: fixed;
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--gold);
+            pointer-events: none;
+            z-index: 200;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+            animation: floatUp 1s ease-out forwards;
+        }
+        @keyframes floatUp {
+            0%   { opacity: 1; transform: translateY(0) scale(1); }
+            30%  { transform: translateY(-10px) scale(1.2); }
+            100% { opacity: 0; transform: translateY(-70px) scale(0.9); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div>
+        <div class="title">☕ Espresso Yourself</div>
+        <div class="subtitle">a coffee card roguelike</div>
+    </div>
+    <div style="text-align:right">
+        <div class="header-coins" id="hdr-coins">🪙 4</div>
+        <div class="header-round" id="hdr-round">Round 1 / 8</div>
+    </div>
+</div>
+
+<!-- Game -->
+<div class="game" id="game-area">
+
+    <!-- Round bar -->
+    <div class="round-bar">
+        <div>
+            <div class="rb-label">Target</div>
+            <div class="rb-val rb-target" id="ui-target">300</div>
+        </div>
+        <div class="progress-wrap">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+            </div>
+        </div>
+        <div style="text-align:right">
+            <div class="rb-label">Score</div>
+            <div class="rb-val rb-score" id="ui-score">0</div>
+        </div>
+    </div>
+
+    <!-- Resources -->
+    <div class="resources">
+        <span>🃏 <span class="res-val" id="ui-hands">4</span> hands</span>
+        <span>🗑 <span class="res-val" id="ui-discards">3</span> discards</span>
+        <span>📦 <span class="res-val" id="ui-deck">48</span> in deck</span>
+    </div>
+
+    <!-- Score preview -->
+    <div class="score-display">
+        <div class="drink-label" id="drink-label">Select ingredients to brew</div>
+        <div class="score-formula" id="score-formula" style="display:none">
+            <div class="chips-pill" id="ui-chips">0</div>
+            <div class="sep">×</div>
+            <div class="mult-pill" id="ui-mult">0</div>
+            <div class="sep">=</div>
+            <div class="total" id="ui-total">0</div>
+        </div>
+        <div class="score-log" id="score-log"></div>
+    </div>
+
+    <!-- Jokers -->
+    <div style="display:flex;flex-direction:column;gap:6px">
+        <div class="section-label">Barista Perks</div>
+        <div class="jokers-row" id="jokers-row"></div>
+    </div>
+
+    <!-- Play area -->
+    <div class="play-area" id="play-area">
+        <div class="play-hint" id="play-hint">Select up to 5 cards from your hand below</div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="btn-row">
+        <button class="btn btn-brew" id="btn-brew" disabled onclick="brew()">☕ Brew It!</button>
+        <button class="btn btn-discard" id="btn-discard" disabled onclick="doDiscard()">🗑 Discard (<span id="disc-n">0</span>)</button>
+    </div>
+
+    <!-- Hand -->
+    <div style="display:flex;flex-direction:column;gap:6px">
+        <div class="section-label">Your Hand — tap to select</div>
+        <div class="hand-row" id="hand-row"></div>
+    </div>
+
+</div>
+
+<!-- Shop -->
+<div class="shop" id="shop-area">
+    <div class="shop-header">
+        <div>
+            <div class="shop-title">☕ The Café Shop</div>
+            <div class="shop-subtitle">Spend wisely. The next round won't be kind.</div>
+        </div>
+        <div class="shop-coins" id="shop-coins">🪙 0</div>
+    </div>
+    <div class="shop-grid" id="shop-grid"></div>
+    <div class="shop-actions">
+        <button class="btn-reroll" id="btn-reroll" onclick="reroll()">🎲 Reroll (1🪙)</button>
+        <button class="btn-next" onclick="nextRound()">Next Round →</button>
+    </div>
+</div>
+
+<!-- Overlay -->
+<div class="overlay" id="overlay">
+    <div class="overlay-title" id="ov-title"></div>
+    <div class="overlay-msg"   id="ov-msg"></div>
+    <button class="btn-again" onclick="initGame()">☕ Brew Again</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════
+
+const ING = {
+    espresso:  { emoji:'☕', name:'Espresso',  chips:20 },
+    milk:      { emoji:'🥛', name:'Milk',      chips:12 },
+    water:     { emoji:'💧', name:'Water',     chips: 8 },
+    foam:      { emoji:'🫧', name:'Foam',      chips:10 },
+    ice:       { emoji:'🧊', name:'Ice',       chips: 8 },
+    syrup:     { emoji:'🍬', name:'Syrup',     chips:14 },
+    chocolate: { emoji:'🍫', name:'Choc.',     chips:16 },
+    coffee:    { emoji:'🫗', name:'Drip',      chips:15 },
+    cream:     { emoji:'🍦', name:'Cream',     chips:18 },
+    bean:      { emoji:'🫘', name:'Bean',      chips:12 },
+};
+
+// Checked strongest → weakest
+const DRINKS = [
+    { id:'affogato',     name:'Affogato',      emoji:'🍨', chips:200, mult:5,   req:{espresso:2,cream:1} },
+    { id:'triple',       name:'Triple Shot',   emoji:'💥', chips:150, mult:4,   req:{espresso:3} },
+    { id:'mocha',        name:'Mocha',         emoji:'🤎', chips:130, mult:3.5, req:{espresso:1,milk:1,chocolate:1} },
+    { id:'flatwhite',    name:'Flat White',    emoji:'🤍', chips:120, mult:3,   req:{espresso:2,milk:1} },
+    { id:'caramellatte', name:'Caramel Latte', emoji:'🧡', chips:110, mult:3,   req:{espresso:1,milk:1,syrup:1} },
+    { id:'cappuccino',   name:'Cappuccino',    emoji:'☕', chips:100, mult:2.5, req:{espresso:1,milk:1,foam:1} },
+    { id:'coldbrew',     name:'Cold Brew',     emoji:'🧊', chips: 90, mult:2,   req:{coffee:1,ice:1,water:1} },
+    { id:'doubleshot',   name:'Double Shot',   emoji:'⚡', chips: 80, mult:2,   req:{espresso:2} },
+    { id:'latte',        name:'Latte',         emoji:'🥛', chips: 70, mult:2,   req:{espresso:1,milk:1} },
+    { id:'macchiato',    name:'Macchiato',     emoji:'🫧', chips: 60, mult:2,   req:{espresso:1,foam:1} },
+    { id:'americano',    name:'Americano',     emoji:'💧', chips: 50, mult:1.5, req:{espresso:1,water:1} },
+    { id:'espresso',     name:'Espresso',      emoji:'☕', chips: 40, mult:1,   req:{espresso:1} },
+    { id:'drip',         name:'Drip Coffee',   emoji:'🫗', chips: 30, mult:1,   req:{coffee:1} },
+];
+
+const ALL_JOKERS = [
+    { id:'grinder',    name:'The Grinder',    emoji:'⚙️', cost:6,
+      desc:'Espresso cards each give +20 chips',
+      fn:(s,c)=>{ s.chips += c.filter(x=>x.t==='espresso').length*20; } },
+    { id:'oatmilk',   name:'Oat Milk',        emoji:'🌾', cost:5,
+      desc:'Milk cards each give +15 chips',
+      fn:(s,c)=>{ s.chips += c.filter(x=>x.t==='milk').length*15; } },
+    { id:'sugarrush', name:'Sugar Rush',      emoji:'🍭', cost:5,
+      desc:'Each Syrup card gives +1 Mult',
+      fn:(s,c)=>{ s.mult += c.filter(x=>x.t==='syrup').length; } },
+    { id:'foammaster',name:'Foam Master',     emoji:'🫧', cost:6,
+      desc:'Foam cards +15 chips; Cappuccino +2 Mult',
+      fn:(s,c,d)=>{ s.chips+=c.filter(x=>x.t==='foam').length*15; if(d.id==='cappuccino') s.mult+=2; } },
+    { id:'chocolatier',name:'Chocolatier',    emoji:'🍫', cost:6,
+      desc:'Chocolate cards give +20 chips',
+      fn:(s,c)=>{ s.chips+=c.filter(x=>x.t==='chocolate').length*20; } },
+    { id:'snob',      name:'Coffee Snob',     emoji:'🎩', cost:5,
+      desc:'Single Espresso hand gets +160 chips',
+      fn:(s,c,d)=>{ if(d.id==='espresso') s.chips+=160; } },
+    { id:'doubledown',name:'Double Down',     emoji:'💪', cost:6,
+      desc:'Double Shot gives +4 Mult',
+      fn:(s,c,d)=>{ if(d.id==='doubleshot') s.mult+=4; } },
+    { id:'coldpress', name:'Cold Press',      emoji:'❄️', cost:6,
+      desc:'Ice cards +12 chips; Cold Brew +2 Mult',
+      fn:(s,c,d)=>{ s.chips+=c.filter(x=>x.t==='ice').length*12; if(d.id==='coldbrew') s.mult+=2; } },
+    { id:'aficionado',name:'The Aficionado',  emoji:'🧐', cost:7,
+      desc:'+0.5 Mult per unique ingredient played',
+      fn:(s,c)=>{ s.mult += new Set(c.map(x=>x.t)).size * 0.5; } },
+    { id:'beancount', name:'Bean Counter',    emoji:'🫘', cost:5,
+      desc:'Bean cards give +30 chips',
+      fn:(s,c)=>{ s.chips+=c.filter(x=>x.t==='bean').length*30; } },
+    { id:'lattelove', name:'Latte Love',      emoji:'💕', cost:6,
+      desc:'Latte & Caramel Latte get +3 Mult',
+      fn:(s,c,d)=>{ if(['latte','caramellatte'].includes(d.id)) s.mult+=3; } },
+    { id:'mochmagic', name:'Mocha Magic',     emoji:'✨', cost:7,
+      desc:'Mocha gets +4 Mult',
+      fn:(s,c,d)=>{ if(d.id==='mocha') s.mult+=4; } },
+    { id:'perfectpour',name:'Perfect Pour',   emoji:'🏆', cost:7,
+      desc:'Flat White gets +5 Mult',
+      fn:(s,c,d)=>{ if(d.id==='flatwhite') s.mult+=5; } },
+    { id:'pride',     name:"Barista's Pride", emoji:'👨‍🍳', cost:6,
+      desc:'First brew each round gives +3 Mult',
+      fn:(s,c,d,st)=>{ if(st.brewsThisRound===1) s.mult+=3; } },
+    { id:'allday',    name:'All Day Blend',   emoji:'🌅', cost:5,
+      desc:'Each card played gives +4 chips',
+      fn:(s,c)=>{ s.chips+=c.length*4; } },
+    { id:'heavycream',name:'Heavy Cream',     emoji:'🍦', cost:6,
+      desc:'Cream cards +25 chips; Affogato +3 Mult',
+      fn:(s,c,d)=>{ s.chips+=c.filter(x=>x.t==='cream').length*25; if(d.id==='affogato') s.mult+=3; } },
+    { id:'waterboy',  name:'Water Boy',       emoji:'💧', cost:4,
+      desc:'Water cards +12 chips; Americano +2 Mult',
+      fn:(s,c,d)=>{ s.chips+=c.filter(x=>x.t==='water').length*12; if(d.id==='americano') s.mult+=2; } },
+    { id:'tripleking',name:'Triple King',     emoji:'👑', cost:8,
+      desc:'Triple Shot gets +6 Mult',
+      fn:(s,c,d)=>{ if(d.id==='triple') s.mult+=6; } },
+    { id:'multiplier',name:'The Multiplier',  emoji:'✖️', cost:9,
+      desc:'Mult × 1.5 after all other bonuses',
+      fn:(s)=>{ s.mult = Math.ceil(s.mult*1.5); } },
+    { id:'goldenbean',name:'Golden Bean',     emoji:'🌟', cost:8,
+      desc:'All chip totals increased by 50%',
+      fn:(s)=>{ s.chips = Math.floor(s.chips*1.5); } },
+];
+
+const BASE_DECK = [
+    ['espresso',8],['milk',6],['water',6],['foam',5],
+    ['ice',5],['syrup',4],['chocolate',4],['coffee',4],
+    ['cream',3],['bean',3],
+];
+
+const TARGETS = [300, 900, 2200, 5500, 12000, 27000, 60000, 130000];
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+
+let G = {};   // global game state
+let cardId = 0;
+
+function initGame() {
+    hideOverlay();
+    cardId = 0;
+    G = {
+        round: 1,
+        score: 0,
+        coins: 4,
+        handsLeft: 4,
+        discardsLeft: 3,
+        brewsThisRound: 0,
+        deck: [],
+        hand: [],
+        discard: [],
+        selected: [],   // card ids
+        jokers: [],
+        levels: {},     // drinkId -> {chips, mult}
+        extraCards: [], // additional cards bought in shop
+        shopItems: [],
+        scoreTags: [],
+        busy: false,
+    };
+    buildDeck();
+    shuffle(G.deck);
+    draw(7);
+    showGame();
+    renderAll();
+}
+
+// ═══════════════════════════════════════════════════════
+//  DECK
+// ═══════════════════════════════════════════════════════
+
+function buildDeck() {
+    G.deck = [];
+    BASE_DECK.forEach(([t, n]) => {
+        for (let i = 0; i < n; i++) G.deck.push({ id: cardId++, t });
+    });
+    G.extraCards.forEach(t => G.deck.push({ id: cardId++, t }));
+}
+
+function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+}
+
+function draw(n) {
+    for (let i = 0; i < n; i++) {
+        if (!G.deck.length) {
+            G.deck = [...G.discard];
+            G.discard = [];
+            shuffle(G.deck);
+        }
+        if (G.deck.length) G.hand.push(G.deck.pop());
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//  DRINK DETECTION & SCORING
+// ═══════════════════════════════════════════════════════
+
+function detectDrink(cards) {
+    const cnt = {};
+    cards.forEach(c => { cnt[c.t] = (cnt[c.t]||0) + 1; });
+    for (const d of DRINKS) {
+        if (Object.entries(d.req).every(([t,n]) => (cnt[t]||0) >= n)) return d;
+    }
+    return null;
+}
+
+function breakdown(drink, cards) {
+    const lvl = G.levels[drink.id] || {chips:0,mult:0};
+    const s = { chips: drink.chips + lvl.chips, mult: drink.mult + lvl.mult };
+    cards.forEach(c => { s.chips += ING[c.t].chips; });
+    G.jokers.forEach(j => j.fn(s, cards, drink, G));
+    return s;
+}
+
+function calcScore(drink, cards) {
+    const b = breakdown(drink, cards);
+    return Math.floor(b.chips * b.mult);
+}
+
+// ═══════════════════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════════════════
+
+function toggleCard(id) {
+    if (G.busy || G.handsLeft <= 0) return;
+    const idx = G.selected.indexOf(id);
+    if (idx === -1) {
+        if (G.selected.length >= 5) return;
+        G.selected.push(id);
+    } else {
+        G.selected.splice(idx, 1);
+    }
+    renderHand();
+    renderPlayArea();
+    renderPreview();
+    renderButtons();
+}
+
+function brew() {
+    if (G.busy || G.handsLeft <= 0 || !G.selected.length) return;
+    const cards = G.hand.filter(c => G.selected.includes(c.id));
+    const drink = detectDrink(cards);
+    if (!drink) return;
+
+    G.busy = true;
+    G.handsLeft--;
+    G.brewsThisRound++;
+
+    const bd    = breakdown(drink, cards);
+    const pts   = Math.floor(bd.chips * bd.mult);
+
+    // move cards to discard
+    G.hand    = G.hand.filter(c => !G.selected.includes(c.id));
+    G.discard.push(...cards);
+    G.selected = [];
+
+    // animate
+    spawnFloatScore(pts);
+    animateScoreCount(G.score, G.score + pts, () => {
+        G.score += pts;
+        G.scoreTags.unshift(`${drink.emoji} ${drink.name}: +${pts.toLocaleString()}`);
+        if (G.scoreTags.length > 5) G.scoreTags.pop();
+        draw(7 - G.hand.length);
+        G.busy = false;
+        renderAll();
+        if (G.score >= TARGETS[G.round-1]) roundWon();
+        else if (G.handsLeft === 0)        gameOver();
+    });
+}
+
+function doDiscard() {
+    if (G.busy || G.discardsLeft <= 0 || !G.selected.length) return;
+    const cards = G.hand.filter(c => G.selected.includes(c.id));
+    G.hand       = G.hand.filter(c => !G.selected.includes(c.id));
+    G.discard.push(...cards);
+    G.selected   = [];
+    G.discardsLeft--;
+    draw(cards.length);
+    renderAll();
+}
+
+// ═══════════════════════════════════════════════════════
+//  ROUND / WIN / LOSE
+// ═══════════════════════════════════════════════════════
+
+function roundWon() {
+    let earned = 4 + G.handsLeft + G.discardsLeft + Math.min(5, Math.floor(G.coins/5));
+    G.coins += earned;
+
+    if (G.round >= 8) {
+        showOverlay('🏆 You Did It!',
+            `You mastered all 8 rounds and became the ultimate barista legend! ` +
+            `Final score: ${G.score.toLocaleString()}. Respect.`);
+        return;
+    }
+
+    generateShop();
+    renderShop();
+    showShop();
+}
+
+function gameOver() {
+    showOverlay('😮 You Burned Out.',
+        `You couldn't hit the target on round ${G.round}. ` +
+        `Score: ${G.score.toLocaleString()}. ` +
+        `Try building around a specific drink next time!`);
+}
+
+function nextRound() {
+    G.round++;
+    G.score = 0;
+    G.handsLeft = 4;
+    G.discardsLeft = 3;
+    G.brewsThisRound = 0;
+    G.scoreTags = [];
+    G.selected = [];
+    G.busy = false;
+    buildDeck();
+    shuffle(G.deck);
+    G.hand = [];
+    G.discard = [];
+    draw(7);
+    showGame();
+    renderAll();
+}
+
+// ═══════════════════════════════════════════════════════
+//  SHOP
+// ═══════════════════════════════════════════════════════
+
+function generateShop() {
+    const items = [];
+    const usedIds = new Set(G.jokers.map(j=>j.id));
+    const avail   = ALL_JOKERS.filter(j=>!usedIds.has(j.id));
+    shuffle(avail);
+
+    // 2 jokers
+    avail.slice(0,2).forEach(j => items.push({
+        kind:'joker', ref:j, cost:j.cost,
+        emoji:j.emoji, name:j.name, desc:j.desc,
+    }));
+
+    // 2 drink level-ups
+    const dPicks = [...DRINKS]; shuffle(dPicks);
+    dPicks.slice(0,2).forEach(d => {
+        const lvl = G.levels[d.id]||{chips:0,mult:0};
+        items.push({
+            kind:'levelup', drinkId:d.id, cost:4,
+            emoji:d.emoji, name:`Upgrade: ${d.name}`,
+            desc:`+20 chips & +1 Mult to ${d.name} (currently +${lvl.chips}c / +${lvl.mult}m)`,
+        });
+    });
+
+    // 1 add-card
+    const types = Object.keys(ING); shuffle(types);
+    const t = types[0];
+    items.push({
+        kind:'addcard', cardType:t, cost:3,
+        emoji:ING[t].emoji, name:`Add ${ING[t].name}`,
+        desc:`Permanently add 2 ${ING[t].name} cards to your deck`,
+    });
+
+    G.shopItems = items;
+}
+
+function reroll() {
+    if (G.coins < 1) return;
+    G.coins--;
+    generateShop();
+    renderShop();
+}
+
+function buy(idx) {
+    const item = G.shopItems[idx];
+    if (!item || G.coins < item.cost) return;
+    if (item.kind === 'joker' && G.jokers.length >= 5) {
+        alert("You can only hold 5 Barista Perks!");
+        return;
+    }
+
+    G.coins -= item.cost;
+
+    if (item.kind === 'joker') {
+        G.jokers.push(item.ref);
+    } else if (item.kind === 'levelup') {
+        if (!G.levels[item.drinkId]) G.levels[item.drinkId] = {chips:0,mult:0};
+        G.levels[item.drinkId].chips += 20;
+        G.levels[item.drinkId].mult  += 1;
+    } else if (item.kind === 'addcard') {
+        G.extraCards.push(item.cardType, item.cardType);
+    }
+
+    G.shopItems.splice(idx, 1);
+    renderShop();
+    document.getElementById('hdr-coins').textContent = `🪙 ${G.coins}`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  ANIMATIONS
+// ═══════════════════════════════════════════════════════
+
+function spawnFloatScore(pts) {
+    const anchor = document.getElementById('score-formula');
+    const rect   = anchor.getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = 'float-score';
+    el.textContent = `+${pts.toLocaleString()}`;
+    el.style.left = (rect.left + rect.width/2 - 40) + 'px';
+    el.style.top  = (rect.top - 10) + 'px';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 1000);
+}
+
+function animateScoreCount(from, to, done) {
+    const el  = document.getElementById('ui-score');
+    const dur = 650;
+    const t0  = performance.now();
+    function step(now) {
+        const p = Math.min(1, (now-t0)/dur);
+        const v = Math.floor(from + (to-from)*p);
+        el.textContent = v.toLocaleString();
+        setProgress(v);
+        if (p < 1) requestAnimationFrame(step);
+        else { el.textContent = to.toLocaleString(); setProgress(to); done(); }
+    }
+    requestAnimationFrame(step);
+}
+
+function setProgress(score) {
+    const pct = Math.min(100, score / TARGETS[G.round-1] * 100);
+    const fill = document.getElementById('progress-fill');
+    fill.style.width = pct + '%';
+    fill.style.background = pct>=100 ? '#f5c842' : pct>60 ? '#6abf69' : '#52a8e0';
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════
+
+function renderAll() {
+    // header
+    document.getElementById('hdr-coins').textContent = `🪙 ${G.coins}`;
+    document.getElementById('hdr-round').textContent = `Round ${G.round} / 8`;
+    // round bar
+    document.getElementById('ui-target').textContent = TARGETS[G.round-1].toLocaleString();
+    document.getElementById('ui-score').textContent  = G.score.toLocaleString();
+    document.getElementById('ui-hands').textContent  = G.handsLeft;
+    document.getElementById('ui-discards').textContent = G.discardsLeft;
+    document.getElementById('ui-deck').textContent   = G.deck.length;
+    setProgress(G.score);
+    renderJokers();
+    renderPlayArea();
+    renderPreview();
+    renderHand();
+    renderButtons();
+    renderScoreLog();
+}
+
+function renderJokers() {
+    const row = document.getElementById('jokers-row');
+    row.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+        if (i < G.jokers.length) {
+            const j = G.jokers[i];
+            row.innerHTML +=
+                `<div class="joker-slot filled">
+                    <div class="joker-emoji">${j.emoji}</div>
+                    <div class="joker-name">${j.name}</div>
+                    <div class="joker-tip">${j.desc}</div>
+                </div>`;
+        } else {
+            row.innerHTML += `<div class="joker-slot empty">empty</div>`;
+        }
+    }
+}
+
+function renderPlayArea() {
+    const area = document.getElementById('play-area');
+    const hint = document.getElementById('play-hint');
+    const sel  = G.hand.filter(c => G.selected.includes(c.id));
+    area.querySelectorAll('.card').forEach(e=>e.remove());
+    if (!sel.length) {
+        area.classList.remove('lit');
+        hint.style.display = 'block';
+    } else {
+        area.classList.add('lit');
+        hint.style.display = 'none';
+        sel.forEach(c => area.appendChild(makeCard(c, false)));
+    }
+}
+
+function renderPreview() {
+    const sel   = G.hand.filter(c => G.selected.includes(c.id));
+    const drink = sel.length ? detectDrink(sel) : null;
+    const label = document.getElementById('drink-label');
+    const fml   = document.getElementById('score-formula');
+
+    if (!drink) {
+        label.textContent = sel.length
+            ? '❌ No valid drink — try a different combo'
+            : 'Select ingredients to brew';
+        fml.style.display = 'none';
+        return;
+    }
+
+    const bd = breakdown(drink, sel);
+    const total = Math.floor(bd.chips * bd.mult);
+    label.textContent = `${drink.emoji} ${drink.name}`;
+    fml.style.display = 'flex';
+    document.getElementById('ui-chips').textContent = bd.chips;
+    document.getElementById('ui-mult').textContent  = '×' + bd.mult;
+    document.getElementById('ui-total').textContent = total.toLocaleString();
+}
+
+function renderHand() {
+    const row = document.getElementById('hand-row');
+    row.innerHTML = '';
+    G.hand.forEach(c => {
+        const el = makeCard(c, true);
+        if (G.selected.includes(c.id)) el.classList.add('selected');
+        row.appendChild(el);
+    });
+}
+
+function makeCard(card, clickable) {
+    const ing = ING[card.t];
+    const el  = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML =
+        `<div class="card-emoji">${ing.emoji}</div>` +
+        `<div class="card-name">${ing.name}</div>` +
+        `<div class="card-chips">${ing.chips}</div>`;
+    if (clickable) {
+        el.onclick = () => toggleCard(card.id);
+    } else {
+        el.classList.add('in-play');
+    }
+    return el;
+}
+
+function renderButtons() {
+    const sel   = G.hand.filter(c => G.selected.includes(c.id));
+    const drink = detectDrink(sel);
+    document.getElementById('btn-brew').disabled    = G.busy || !drink || G.handsLeft<=0;
+    document.getElementById('btn-discard').disabled = G.busy || !sel.length || G.discardsLeft<=0;
+    document.getElementById('disc-n').textContent   = sel.length;
+}
+
+function renderScoreLog() {
+    document.getElementById('score-log').innerHTML =
+        G.scoreTags.map(t => `<div class="score-tag">${t}</div>`).join('');
+}
+
+function renderShop() {
+    document.getElementById('shop-coins').textContent = `🪙 ${G.coins}`;
+    document.getElementById('btn-reroll').disabled    = G.coins < 1;
+    const grid = document.getElementById('shop-grid');
+    grid.innerHTML = '';
+    const kindLabel = { joker:'☕ Barista Perk', levelup:'⬆️ Drink Upgrade', addcard:'🃏 Add Cards' };
+    G.shopItems.forEach((item, i) => {
+        grid.innerHTML +=
+            `<div class="shop-item">
+                <div class="shop-item-type">${kindLabel[item.kind]||''}</div>
+                <div class="shop-item-emoji">${item.emoji}</div>
+                <div class="shop-item-name">${item.name}</div>
+                <div class="shop-item-desc">${item.desc}</div>
+                <button class="btn-buy" onclick="buy(${i})" ${G.coins>=item.cost?'':'disabled'}>
+                    Buy — 🪙${item.cost}
+                </button>
+            </div>`;
+    });
+}
+
+// ═══════════════════════════════════════════════════════
+//  SHOW / HIDE
+// ═══════════════════════════════════════════════════════
+
+function showGame() {
+    document.getElementById('game-area').style.display = 'flex';
+    document.getElementById('shop-area').classList.remove('active');
+}
+function showShop() {
+    document.getElementById('game-area').style.display = 'none';
+    document.getElementById('shop-area').classList.add('active');
+}
+function showOverlay(title, msg) {
+    document.getElementById('ov-title').textContent = title;
+    document.getElementById('ov-msg').textContent   = msg;
+    document.getElementById('overlay').classList.add('active');
+}
+function hideOverlay() {
+    document.getElementById('overlay').classList.remove('active');
+}
+
+// ═══════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════
+initGame();
+</script>
+</body>
+</html>
