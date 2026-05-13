@@ -35,6 +35,7 @@ export class Enemy {
     this.color = this._tierColor();
     this.glowColor = this.color;
     this.idleBob = Math.random() * Math.PI * 2;
+    this.idleAnim = Math.random(); // 0-1 cycling for sprite animation
     this.deathAnim = 0;
     this.hurtFlash = 0;
     this.reachedPosition = false;
@@ -60,6 +61,7 @@ export class Enemy {
     }
 
     this.idleBob += dt * 0.003;
+    this.idleAnim = (this.idleAnim + dt * 0.001) % 1;
     this.y = this.baseY + Math.sin(this.idleBob) * 2;
 
     // Approach player
@@ -131,81 +133,75 @@ export class Enemy {
     return this.hp <= 0;
   }
 
-  render(ctx) {
+  render(ctx, spriteFactory) {
     ctx.save();
     const cx = this.x;
     const cy = this.y;
 
     // Death animation
     if (!this.alive) {
-      ctx.globalAlpha = Math.max(0, 1 - this.deathAnim);
       if (this.deathAnim > 1) {
         ctx.restore();
         return;
       }
+      ctx.globalAlpha = Math.max(0, 1 - this.deathAnim);
       ctx.translate(cx, cy);
       ctx.scale(1 + this.deathAnim * 0.5, 1 + this.deathAnim * 0.5);
       ctx.translate(-cx, -cy);
     }
 
-    // Glow
-    const glowColor = this.state === 'telegraphing' || this.state === 'attacking'
-      ? '#ff0000'
-      : this.isTargetedBy ? '#ffff00' : this.color;
-    ctx.shadowBlur = this.state === 'telegraphing' ? 25 : 12;
-    ctx.shadowColor = glowColor;
+    // Map tier to sprite type
+    const spriteType = this._spriteType();
 
-    // Hurt flash
-    if (this.hurtFlash > 0) {
-      ctx.shadowBlur = 30;
-      ctx.shadowColor = '#ffffff';
+    // Map state to sprite state + progress
+    let spriteState = 'idle';
+    let progress = 0;
+    if (!this.alive) {
+      spriteState = 'death';
+      progress = Math.min(1, this.deathAnim);
+    } else if (this.state === 'attacking') {
+      spriteState = 'attack';
+      progress = this.attackAnim || 0;
+    } else if (this.hurtFlash > 0) {
+      spriteState = 'hit';
+      progress = this.hurtFlash > 75 ? 0 : 1;
+    } else {
+      spriteState = 'idle';
+      progress = (this.idleAnim || 0) % 1;
     }
 
-    // Body
-    ctx.fillStyle = '#0a0a1a';
-    ctx.strokeStyle = glowColor;
-    ctx.lineWidth = 2;
+    // Tinting
+    let tint = null;
+    let tintAlpha = 0;
+    if (this.hurtFlash > 0) {
+      tint = '#ffffff';
+      tintAlpha = 0.5;
+    } else if (this.isTargetedBy) {
+      tint = '#ffff00';
+      tintAlpha = 0.15;
+    } else if (this.state === 'telegraphing') {
+      tint = '#ff0000';
+      tintAlpha = 0.2 + Math.sin((this.stateTimer || 0) * 0.02) * 0.1;
+    }
 
-    // Enemy shape — more angular/aggressive than player
-    const hw = this.width / 2;
-    const hh = this.height / 2;
+    if (spriteFactory && spriteFactory.ready) {
+      spriteFactory.draw(ctx, spriteType, spriteState, progress, cx, cy, {
+        tint,
+        tintAlpha,
+        flipX: true,  // enemies face left (toward player)
+      });
+    }
 
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - hh - 5);
-    ctx.lineTo(cx + hw + 3, cy - hh + 10);
-    ctx.lineTo(cx + hw, cy + hh);
-    ctx.lineTo(cx - hw, cy + hh);
-    ctx.lineTo(cx - hw - 3, cy - hh + 10);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Inner lines
-    ctx.strokeStyle = glowColor;
-    ctx.globalAlpha = (this.alive ? 0.3 : 0.1);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(cx - hw + 5, cy - 5);
-    ctx.lineTo(cx + hw - 5, cy - 5);
-    ctx.moveTo(cx, cy - hh);
-    ctx.lineTo(cx, cy + hh);
-    ctx.stroke();
-    ctx.globalAlpha = this.alive ? 1 : Math.max(0, 1 - this.deathAnim);
-
-    // Eyes (menacing)
-    ctx.fillStyle = glowColor;
-    ctx.shadowBlur = 8;
-    ctx.fillRect(cx - 8, cy - hh + 15, 5, 3);
-    ctx.fillRect(cx + 3, cy - hh + 15, 5, 3);
-
-    // Telegraph warning indicator
-    if (this.state === 'telegraphing') {
-      const progress = 1 - (this.stateTimer / this.stateDuration);
+    // Telegraph warning indicator (drawn on top of sprite)
+    if (this.state === 'telegraphing' && this.alive) {
+      const tp = 1 - (this.stateTimer / this.stateDuration);
       ctx.strokeStyle = '#ff0000';
       ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.5 + Math.sin(progress * Math.PI * 6) * 0.5;
+      ctx.globalAlpha = 0.5 + Math.sin(tp * Math.PI * 6) * 0.5;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#ff0000';
       ctx.beginPath();
-      ctx.arc(cx, cy, this.width + 10 + Math.sin(progress * Math.PI * 4) * 5, 0, Math.PI * 2 * progress);
+      ctx.arc(cx, cy, this.width + 10 + Math.sin(tp * Math.PI * 4) * 5, 0, Math.PI * 2 * tp);
       ctx.stroke();
       ctx.globalAlpha = 1;
 
@@ -213,19 +209,35 @@ export class Enemy {
       ctx.fillStyle = '#ff0000';
       ctx.font = 'bold 18px monospace';
       ctx.textAlign = 'center';
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = '#ff0000';
-      ctx.fillText('!', cx, cy - hh - 25);
+      ctx.fillText('!', cx, cy - this.height / 2 - 25);
     }
 
     // Target word above head
     if (this.alive) {
-      const wordY = cy - hh - (this.state === 'telegraphing' ? 40 : 15);
-      ctx.font = `bold ${this.tier === 'boss' ? 16 : 13}px 'Courier New', monospace`;
+      const hh = this.height / 2;
+      const wordY = cy - hh - (this.state === 'telegraphing' ? 40 : 18);
+      
+      // Word background pill
+      ctx.font = `bold ${this.tier === 'boss' ? 15 : 12}px 'Courier New', monospace`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = this.isTargetedBy ? '#ffff00' : glowColor;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = ctx.fillStyle;
+      const metrics = ctx.measureText(this.word);
+      const pillW = metrics.width + 12;
+      const pillH = 16;
+      ctx.fillStyle = this.state === 'telegraphing' ? 'rgba(255,0,0,0.25)' : 'rgba(0,0,0,0.6)';
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(cx - pillW / 2, wordY - pillH + 3, pillW, pillH, 3);
+      } else {
+        ctx.rect(cx - pillW / 2, wordY - pillH + 3, pillW, pillH);
+      }
+      ctx.fill();
+      
+      // Word text
+      const wordColor = this.isTargetedBy ? '#ffff00' : 
+                         this.state === 'telegraphing' ? '#ff4444' : this.color;
+      ctx.fillStyle = wordColor;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = wordColor;
       ctx.fillText(this.word, cx, wordY);
     }
 
@@ -234,7 +246,7 @@ export class Enemy {
       const barW = this.width + 10;
       const barH = 3;
       const barX = cx - barW / 2;
-      const barY = cy + hh + 8;
+      const barY = cy + this.height / 2 + 8;
       const hpRatio = this.hp / this.maxHp;
 
       ctx.fillStyle = '#1a1a2f';
@@ -247,5 +259,15 @@ export class Enemy {
     }
 
     ctx.restore();
+  }
+
+  _spriteType() {
+    switch (this.tier) {
+      case 'easy':   return 'drone';
+      case 'medium': return 'scout';
+      case 'hard':   return 'brute';
+      case 'boss':   return 'boss';
+      default:       return 'drone';
+    }
   }
 }

@@ -530,9 +530,9 @@ export class CombatManager {
 
   // ─── Rendering helpers ────────────────────────────────────────
 
-  renderEnemies(ctx) {
+  renderEnemies(ctx, spriteFactory) {
     for (const enemy of this.enemies) {
-      enemy.render(ctx);
+      enemy.render(ctx, spriteFactory);
     }
   }
 

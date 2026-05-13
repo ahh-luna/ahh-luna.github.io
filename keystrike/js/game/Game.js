@@ -13,6 +13,7 @@ import { Player } from './Player.js';
 import { CombatManager } from './CombatManager.js';
 import { ParticleSystem } from '../fx/Particles.js';
 import { ScreenFX } from '../fx/ScreenFX.js';
+import { SpriteFactory } from '../sprites/SpriteFactory.js';
 
 export class Game {
   constructor(canvas, logicalWidth, logicalHeight) {
@@ -31,6 +32,10 @@ export class Game {
     // FX
     this.particles = new ParticleSystem();
     this.screenFX = new ScreenFX();
+
+    // Sprite system
+    this.sprites = new SpriteFactory();
+    this.sprites.init();
 
     // Player
     this.player = new Player(120, this.height / 2 - 20);
@@ -577,8 +582,8 @@ export class Game {
     this._renderMiniBank(ctx, W, H);
 
     // Render entities
-    this.player.render(ctx);
-    this.combat.renderEnemies(ctx);
+    this.player.render(ctx, this.sprites);
+    this.combat.renderEnemies(ctx, this.sprites);
   }
 
   _renderMiniBank(ctx, W, H) {

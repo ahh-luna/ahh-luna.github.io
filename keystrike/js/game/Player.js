@@ -118,23 +118,8 @@ export class Player {
     }
   }
 
-  render(ctx) {
+  render(ctx, spriteFactory) {
     ctx.save();
-    const drawX = this.x;
-    const drawY = this.y;
-
-    // Glow
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = this.glowColor;
-
-    // Body
-    const bodyW = this.width;
-    const bodyH = this.height;
-
-    // Hurt flash
-    if (this.state === 'hurt') {
-      ctx.globalAlpha = 0.5 + Math.sin(this.stateTimer * 0.05) * 0.5;
-    }
 
     // Dodge offset
     let offsetX = 0;
@@ -142,119 +127,32 @@ export class Player {
       offsetX = -40 * Math.sin(this.attackAnim * Math.PI);
     }
 
-    // Draw cyberpunk warrior
-    const cx = drawX + offsetX;
-    const cy = drawY;
+    const cx = this.x + offsetX;
+    const cy = this.y;
 
-    // Legs
-    ctx.strokeStyle = this.color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(cx - 8, cy + bodyH / 2);
-    ctx.lineTo(cx - 4, cy + bodyH / 2 + 20);
-    ctx.moveTo(cx + 8, cy + bodyH / 2);
-    ctx.lineTo(cx + 4, cy + bodyH / 2 + 20);
-    ctx.stroke();
+    // Hurt flash
+    const isHurt = this.state === 'hurt';
+    const alpha = isHurt ? (0.5 + Math.sin(this.stateTimer * 0.05) * 0.5) : 1;
 
-    // Body (rectangle with neon edge)
-    ctx.fillStyle = '#0a0a1a';
-    ctx.strokeStyle = this.glowColor;
-    ctx.lineWidth = 2;
-    ctx.fillRect(cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH);
-    ctx.strokeRect(cx - bodyW / 2, cy - bodyH / 2, bodyW, bodyH);
-
-    // Inner detail lines
-    ctx.strokeStyle = this.color;
-    ctx.globalAlpha = 0.3;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(cx - bodyW / 2 + 5, cy - bodyH / 2 + 10);
-    ctx.lineTo(cx + bodyW / 2 - 5, cy - bodyH / 2 + 10);
-    ctx.moveTo(cx, cy - bodyH / 2);
-    ctx.lineTo(cx, cy + bodyH / 2);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    // Head
-    ctx.fillStyle = '#0a0a1a';
-    ctx.strokeStyle = this.glowColor;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy - bodyH / 2 - 12, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Visor (eye line)
-    ctx.strokeStyle = this.glowColor;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 8, cy - bodyH / 2 - 13);
-    ctx.lineTo(cx + 8, cy - bodyH / 2 - 13);
-    ctx.stroke();
-
-    // Arm / weapon
-    ctx.strokeStyle = this.glowColor;
-    ctx.lineWidth = 2.5;
-    if (this.state === 'attacking' && this.attackTarget) {
-      // Swing arm toward target
-      const angle = Math.atan2(
-        this.attackTarget.y - cy,
-        this.attackTarget.x - cx
-      );
-      const swingAngle = angle + Math.sin(this.attackAnim * Math.PI) * 1.2;
-      const armLen = 35;
-      ctx.beginPath();
-      ctx.moveTo(cx + bodyW / 2, cy - 5);
-      ctx.lineTo(
-        cx + bodyW / 2 + Math.cos(swingAngle) * armLen,
-        cy - 5 + Math.sin(swingAngle) * armLen
-      );
-      ctx.stroke();
-
-      // Blade glow
-      ctx.shadowBlur = 20;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(cx + bodyW / 2, cy - 5);
-      ctx.lineTo(
-        cx + bodyW / 2 + Math.cos(swingAngle) * armLen,
-        cy - 5 + Math.sin(swingAngle) * armLen
-      );
-      ctx.stroke();
-    } else if (this.state === 'blocking') {
-      // Shield arm
-      ctx.fillStyle = this.glowColor;
-      ctx.globalAlpha = 0.3;
-      ctx.beginPath();
-      ctx.arc(cx + bodyW / 2 + 15, cy, 18, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = this.glowColor;
-      ctx.beginPath();
-      ctx.arc(cx + bodyW / 2 + 15, cy, 18, 0, Math.PI * 2);
-      ctx.stroke();
-    } else {
-      // Idle arm
-      ctx.beginPath();
-      ctx.moveTo(cx + bodyW / 2, cy - 5);
-      ctx.lineTo(cx + bodyW / 2 + 15, cy + 10);
-      ctx.stroke();
+    // Map game state to sprite state
+    let spriteState = 'idle';
+    let progress = 0;
+    switch (this.state) {
+      case 'attacking': spriteState = 'attack'; progress = this.attackAnim; break;
+      case 'blocking':  spriteState = 'defend'; progress = 0; break;
+      case 'dodging':   spriteState = 'defend'; progress = this.attackAnim; break;
+      case 'casting':   spriteState = 'cast';   progress = this.attackAnim; break;
+      case 'hurt':      spriteState = 'hit';    progress = this.attackAnim; break;
+      default:          spriteState = 'idle';    progress = (this.idleBob % (Math.PI * 2)) / (Math.PI * 2); break;
     }
 
-    // HP bar above
-    const barW = 50;
-    const barH = 4;
-    const barX = cx - barW / 2;
-    const barY = cy - bodyH / 2 - 32;
-    const hpRatio = this.hp / this.maxHp;
-    
-    ctx.fillStyle = '#1a1a2f';
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.fillStyle = hpRatio > 0.5 ? '#00ff88' : hpRatio > 0.25 ? '#ffaa00' : '#ff4444';
-    ctx.shadowBlur = 5;
-    ctx.shadowColor = ctx.fillStyle;
-    ctx.fillRect(barX, barY, barW * hpRatio, barH);
+    if (spriteFactory && spriteFactory.ready) {
+      spriteFactory.draw(ctx, 'player', spriteState, progress, cx, cy, {
+        alpha,
+        tint: isHurt ? '#ff0044' : null,
+        tintAlpha: isHurt ? 0.4 : 0,
+      });
+    }
 
     ctx.restore();
   }
